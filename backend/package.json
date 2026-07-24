@@ -1,0 +1,32 @@
+{
+  "name": "@lms/backend-root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "gateway",
+    "auth-service",
+    "organization-service",
+    "academic-service",
+    "billing-service",
+    "notification-service"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"**/*.ts\"",
+    "prisma:generate": "npm run prisma:generate --workspaces --if-present",
+    "seed": "node scripts/seed-dev.js",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/winston": "^2.4.4",
+    "@typescript-eslint/eslint-plugin": "^6.16.0",
+    "@typescript-eslint/parser": "^6.16.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3"
+  }
+}

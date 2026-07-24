@@ -1,0 +1,52 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PlanType {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model Subscription {
+  id             String      @id @default(uuid())
+  organizationId String      @unique
+  plan           PlanType    @default(FREE)
+  amount         Float
+  billingCycle   String      @default("monthly")
+  isActive       Boolean     @default(true)
+  nextBillingAt  DateTime
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  invoices       Invoice[]
+
+  @@index([organizationId])
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  organizationId String
+  subscriptionId String
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  amount         Float
+  status         PaymentStatus @default(PENDING)
+  pdfR2Url       String?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([subscriptionId])
+}

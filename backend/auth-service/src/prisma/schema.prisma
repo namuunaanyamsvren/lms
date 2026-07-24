@@ -1,0 +1,92 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-auth"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ORG_ADMIN
+  INSTRUCTOR
+  STUDENT
+  PARENT
+  STAFF
+  PRINCIPAL
+}
+
+model UserAccount {
+  id               String               @id @default(uuid())
+  organizationId   String
+  username         String?
+  email            String
+  phone            String?
+  passwordHash     String
+  firstName        String?
+  lastName         String?
+  role             Role                 @default(STUDENT)
+  isActive         Boolean              @default(true)
+  isEmailVerified  Boolean              @default(false)
+  isPhoneVerified  Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  refreshTokens    RefreshToken[]
+  resetTokens      PasswordResetToken[]
+  verificationTokens VerificationToken[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([username])
+  @@index([phone])
+}
+
+model RefreshToken {
+  id             String      @id @default(uuid())
+  organizationId String
+  userId         String
+  token          String      @unique
+  expiresAt      DateTime
+  revoked        Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  user           UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id             String      @id @default(uuid())
+  organizationId String
+  userId         String
+  tokenHash      String      @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime    @default(now())
+  user           UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+enum VerificationType {
+  EMAIL
+  PHONE
+}
+
+model VerificationToken {
+  id             String            @id @default(uuid())
+  organizationId String
+  userId         String
+  type           VerificationType
+  tokenHash      String            @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime          @default(now())
+  user           UserAccount       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}

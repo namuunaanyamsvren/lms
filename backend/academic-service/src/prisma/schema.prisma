@@ -1,0 +1,493 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-academic"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ORG_ADMIN
+  INSTRUCTOR
+  STUDENT
+  PARENT
+  FINANCE
+  STAFF
+  PRINCIPAL
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  SINGLE_CHOICE
+  TRUE_FALSE
+  TEXT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum NotificationType {
+  EMAIL
+  IN_APP
+  PUSH
+}
+
+enum DocumentRequestStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ScholarshipRequestStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+// 1. Organization
+model Organization {
+  id             String         @id @default(uuid())
+  organizationId String         // Tenant identifier (self-reference)
+  name           String
+  slug           String         @unique
+  domain         String?
+  logoUrl        String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  users          User[]
+  courses        Course[]
+  invoices       Invoice[]
+  payments       Payment[]
+
+  @@index([organizationId])
+}
+
+// 2. User
+model User {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  username       String?
+  email          String
+  phone          String?
+  passwordHash   String?
+  firstName      String
+  lastName       String
+  role           Role           @default(STUDENT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  enrollments    Enrollment[]
+  submissions    Submission[]
+  quizAttempts   QuizAttempt[]
+  attendances    Attendance[]
+  grades         Grade[]
+  certificates   Certificate[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  announcements       Announcement[]
+  documentRequests    DocumentRequest[]
+  scholarshipRequests ScholarshipRequest[]
+  guardianAsParent    Guardian[]           @relation("GuardianParent")
+  guardianAsStudent   Guardian[]           @relation("GuardianStudent")
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([username])
+  @@index([phone])
+}
+
+// 3. Course
+model Course {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  department     String?
+  instructorId   String
+  isPublished    Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  modules        Module[]
+  cohorts        Cohort[]
+  certificates   Certificate[]
+
+  @@index([organizationId])
+}
+
+// 4. Module
+model Module {
+  id             String         @id @default(uuid())
+  organizationId String
+  courseId       String
+  course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title          String
+  order          Int            @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  lessons        Lesson[]
+  assignments    Assignment[]
+  quizzes        Quiz[]
+
+  @@index([organizationId])
+  @@index([courseId])
+}
+
+// 5. Lesson
+model Lesson {
+  id             String         @id @default(uuid())
+  organizationId String
+  moduleId       String
+  module         Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title          String
+  content        String?
+  videoUrl       String?
+  order          Int            @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([moduleId])
+}
+
+// 6. Cohort
+model Cohort {
+  id             String         @id @default(uuid())
+  organizationId String
+  courseId       String
+  course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name           String
+  startDate      DateTime
+  endDate        DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  enrollments    Enrollment[]
+  attendances    Attendance[]
+
+  @@index([organizationId])
+  @@index([courseId])
+}
+
+// 7. Enrollment
+model Enrollment {
+  id             String         @id @default(uuid())
+  organizationId String
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohortId       String
+  cohort         Cohort         @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  enrolledAt     DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([organizationId, userId, cohortId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([cohortId])
+}
+
+// 8. Assignment
+model Assignment {
+  id             String         @id @default(uuid())
+  organizationId String
+  moduleId       String
+  module         Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  dueDate        DateTime
+  maxPoints      Float          @default(100)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  submissions    Submission[]
+
+  @@index([organizationId])
+  @@index([moduleId])
+}
+
+// 9. Submission
+model Submission {
+  id             String         @id @default(uuid())
+  organizationId String
+  assignmentId   String
+  assignment     Assignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  content        String?
+  fileUrl        String?
+  submittedAt    DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  grades         Grade[]
+
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+// 10. Quiz
+model Quiz {
+  id             String         @id @default(uuid())
+  organizationId String
+  moduleId       String
+  module         Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title          String
+  timeLimitMins  Int?
+  passingScore   Float          @default(70)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  questions      Question[]
+  quizAttempts   QuizAttempt[]
+
+  @@index([organizationId])
+  @@index([moduleId])
+}
+
+// 11. Question
+model Question {
+  id             String         @id @default(uuid())
+  organizationId String
+  quizId         String
+  quiz           Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  text           String
+  type           QuestionType   @default(SINGLE_CHOICE)
+  optionsJson    String?
+  correctAnswer  String
+  points         Float          @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([quizId])
+}
+
+// 12. QuizAttempt
+model QuizAttempt {
+  id             String         @id @default(uuid())
+  organizationId String
+  quizId         String
+  quiz           Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score          Float?
+  passed         Boolean?
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([quizId])
+  @@index([studentId])
+}
+
+// 13. Attendance
+model Attendance {
+  id             String           @id @default(uuid())
+  organizationId String
+  cohortId       String
+  cohort         Cohort           @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date           DateTime
+  status         AttendanceStatus @default(PRESENT)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([organizationId])
+  @@index([cohortId])
+  @@index([studentId])
+}
+
+// 14. Grade
+model Grade {
+  id             String         @id @default(uuid())
+  organizationId String
+  studentId      String
+  student        User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submissionId   String?
+  submission     Submission?    @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  score          Float
+  feedback       String?
+  gradedAt       DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([studentId])
+}
+
+// 15. Certificate
+model Certificate {
+  id             String         @id @default(uuid())
+  organizationId String
+  studentId      String
+  student        User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  certificateUrl String
+  issuedAt       DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+// 16. Invoice
+model Invoice {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Float
+  status         PaymentStatus  @default(PENDING)
+  pdfR2Url       String?
+  paidAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  payments       Payment[]
+
+  @@index([organizationId])
+}
+
+// 17. Payment
+model Payment {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount         Float
+  method         String
+  transactionId  String?
+  status         PaymentStatus  @default(COMPLETED)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([invoiceId])
+}
+
+// 18. Notification
+model Notification {
+  id             String           @id @default(uuid())
+  organizationId String
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  body           String
+  type           NotificationType @default(IN_APP)
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// 19. AuditLog
+model AuditLog {
+  id             String         @id @default(uuid())
+  organizationId String
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String
+  entity         String
+  entityId       String?
+  details        String?
+  ipAddress      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// 20. Guardian (parent <-> student link)
+model Guardian {
+  id             String   @id @default(uuid())
+  organizationId String
+  parentUserId   String
+  parentUser     User     @relation("GuardianParent", fields: [parentUserId], references: [id], onDelete: Cascade)
+  studentUserId  String
+  studentUser    User     @relation("GuardianStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, parentUserId, studentUserId])
+  @@index([organizationId])
+  @@index([parentUserId])
+  @@index([studentUserId])
+}
+
+// 21. Announcement (org-wide broadcast, distinct from per-recipient Notification)
+model Announcement {
+  id             String   @id @default(uuid())
+  organizationId String
+  title          String
+  body           String
+  authorId       String?
+  author         User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([authorId])
+}
+
+// 22. DocumentRequest
+model DocumentRequest {
+  id             String                 @id @default(uuid())
+  organizationId String
+  studentId      String
+  student        User                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  title          String
+  status         DocumentRequestStatus  @default(PENDING)
+  requestedAt    DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([organizationId])
+  @@index([studentId])
+}
+
+// 23. ScholarshipRequest
+model ScholarshipRequest {
+  id             String                    @id @default(uuid())
+  organizationId String
+  studentId      String
+  student        User                      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  program        String
+  status         ScholarshipRequestStatus  @default(NEW)
+  requestedAt    DateTime                  @default(now())
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([organizationId])
+  @@index([studentId])
+}

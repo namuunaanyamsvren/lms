@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: lms-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: lms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lms-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: lms-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lms-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: lms-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - lms-network
+
+  # Application Microservices
+  gateway:
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+    container_name: lms-gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      AUTH_SERVICE_URL: http://auth-service:8001
+      ORGANIZATION_SERVICE_URL: http://organization-service:8002
+      ACADEMIC_SERVICE_URL: http://academic-service:8003
+      BILLING_SERVICE_URL: http://billing-service:8004
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+    depends_on:
+      - auth-service
+      - organization-service
+      - academic-service
+      - billing-service
+      - notification-service
+    networks:
+      - lms-network
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./auth-service/Dockerfile
+    container_name: lms-auth-service
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      NODE_ENV: production
+      PORT: 8001
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=auth
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_ACCESS_SECRET: super-secret-jwt-key
+      JWT_REFRESH_SECRET: super-secret-refresh-key
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - lms-network
+
+  organization-service:
+    build:
+      context: .
+      dockerfile: ./organization-service/Dockerfile
+    container_name: lms-organization-service
+    restart: always
+    ports:
+      - "8002:8002"
+    environment:
+      NODE_ENV: production
+      PORT: 8002
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=organization
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: super-secret-jwt-key
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - lms-network
+
+  academic-service:
+    build:
+      context: .
+      dockerfile: ./academic-service/Dockerfile
+    container_name: lms-academic-service
+    restart: always
+    ports:
+      - "8003:8003"
+    environment:
+      NODE_ENV: production
+      PORT: 8003
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=academic
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_ACCESS_SECRET: super-secret-jwt-key
+      JWT_REFRESH_SECRET: super-secret-refresh-key
+      AUTH_SERVICE_URL: http://auth-service:8001
+      BILLING_SERVICE_URL: http://billing-service:8004
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - lms-network
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: ./billing-service/Dockerfile
+    container_name: lms-billing-service
+    restart: always
+    ports:
+      - "8004:8004"
+    environment:
+      NODE_ENV: production
+      PORT: 8004
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=billing
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: super-secret-jwt-key
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - lms-network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./notification-service/Dockerfile
+    container_name: lms-notification-service
+    restart: always
+    ports:
+      - "8005:8005"
+    environment:
+      NODE_ENV: production
+      PORT: 8005
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=notification
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: super-secret-jwt-key
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - lms-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  lms-network:
+    driver: bridge

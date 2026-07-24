@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:8001/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Bash(curl -s -o /tmp/gw_resp.json -w \"%{http_code}\\\\n\" -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s --max-time 5 -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:8001/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Bash(curl -s --max-time 5 -o /tmp/gw_resp.json -w \"HTTP:%{http_code}\\\\n\" -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Bash(curl -s --max-time 5 -o /tmp/gw_health.json -w \"HTTP:%{http_code}\\\\n\" http://localhost:8000/api/auth/me -H \"Authorization: Bearer bogus\")",
+      "Bash(curl -s --max-time 5 -o /tmp/direct_health.json -w \"HTTP:%{http_code}\\\\n\" http://localhost:8001/api/auth/me -H \"Authorization: Bearer bogus\")",
+      "Bash(curl -s --max-time 5 -o /tmp/gw2.json -w \"HTTP:%{http_code}\\\\n\" -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Bash(curl -s --max-time 5 -o /tmp/direct2.json -w \"HTTP:%{http_code}\\\\n\" -X POST http://localhost:8001/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@a.com\",\"password\":\"x\"}')",
+      "Bash(pkill -f \"ts-node -T src/index.ts\")",
+      "Bash(npx prisma *)",
+      "Bash(PGPASSWORD=postgrespassword psql -h localhost -p 5432 -U postgres -d lms_db -c '\\\\dt auth.*')",
+      "Bash(mv express.d.ts express.ts)",
+      "Bash(rm -rf dist)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(Object.keys\\(require\\('@lms/shared'\\)\\)\\)\")",
+      "Bash(node -pe \"require\\('/tmp/login.json'\\).data.token\")",
+      "Bash(node -pe \"require\\('/tmp/login.json'\\).data.refreshToken\")",
+      "Bash(node -pe \"require\\('/tmp/reg.json'\\).data.emailVerificationToken\")",
+      "Bash(curl -s --max-time 5 -w '\\\\nHTTP:%{http_code}\\\\n' http://localhost:8001/api/auth/me -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(curl -s --max-time 5 -w '\\\\nHTTP:%{http_code}\\\\n' http://localhost:8001/api/auth/me)",
+      "Bash(node -pe \"require\\('/tmp/reg.json'\\).data.token\")",
+      "Bash(curl -s --max-time 5 -w '\\\\nHTTP:%{http_code}\\\\n' -X POST http://localhost:8001/api/auth/send-verification -H 'Content-Type: application/json' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -d '{\"type\":\"EMAIL\"}')",
+      "Bash(curl -s --max-time 5 -w '\\\\nHTTP:%{http_code}\\\\n' -X POST http://localhost:8001/api/auth/send-verification -H 'Content-Type: application/json' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -d '{\"type\":\"PHONE\"}')",
+      "Bash(curl -s --max-time 5 -w '\\\\nHTTP:%{http_code}\\\\n' -X POST http://localhost:8001/api/auth/send-verification -H 'Content-Type: application/json' -d '{\"type\":\"EMAIL\"}')",
+      "Bash(docker compose *)",
+      "Bash(lsof -iTCP -sTCP:LISTEN -P)",
+      "Bash(lsof -iTCP:8003 -sTCP:LISTEN -P)",
+      "Bash(npm start *)",
+      "Bash(disown)",
+      "Bash(curl -s http://localhost:8003/health -w \"\\\\n%{http_code}\\\\n\")"
+    ]
+  }
+}
