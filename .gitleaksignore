@@ -4,3 +4,8 @@
 5385db9397a8050390b7f603405406c1f8a791b3:.claude/settings.local.json:curl-auth-header:26
 5385db9397a8050390b7f603405406c1f8a791b3:.claude/settings.local.json:curl-auth-header:27
 5385db9397a8050390b7f603405406c1f8a791b3:.claude/settings.local.json:curl-auth-header:30
+
+# False positive: empty provider token placeholder in a committed example env
+# file. This preserves detection for any non-empty token value and every other
+# generic-api-key finding.
+c8fe3e8d2a888d31eb70aa5e7f56c7079a08539c:backend/notification-service/.env.example:generic-api-key:19
