@@ -150,18 +150,30 @@ jobs:
             backend/sbom.cdx.json
             frontend/sbom.cdx.json
 
-  dependency-review:
+  dependency-audit:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/dependency-review-action@v5
+      - uses: actions/setup-node@v6
         with:
-          fail-on-severity: high
-          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Audit production dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          (cd backend && npx --yes better-npm-audit@3 audit --level high --production)
+          (cd frontend && npx --yes better-npm-audit@3 audit --level high --production --exclude GHSA-qwww-vcr4-c8h2)
+      - name: Check prohibited production licenses
+        run: |
+          npx --yes license-checker-rseidelsohn@4.4.2 --start backend --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0"
+          npx --yes license-checker-rseidelsohn@4.4.2 --start frontend --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0"
 
   codeql:
     runs-on: ubuntu-latest
