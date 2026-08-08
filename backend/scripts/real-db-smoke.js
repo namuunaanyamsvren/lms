@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 const process = require('node:process');
+
+const backendRoot = path.resolve(__dirname, '..');
 
 const required = ['DATABASE_URL'];
 const missing = required.filter(key => !process.env[key]);
@@ -23,7 +26,7 @@ const env = {
 const run = (name, command, args) => {
   console.log(`\n[real-db-smoke] ${name}`);
   const result = spawnSync(command, args, {
-    cwd: process.cwd(),
+    cwd: backendRoot,
     env,
     stdio: 'inherit',
     shell: false,
@@ -34,14 +37,12 @@ const run = (name, command, args) => {
   }
 };
 
-run('generate Prisma clients', 'npm', ['run', 'prisma:generate', '--prefix', 'backend']);
-run('deploy all service migrations', 'npm', ['run', 'prisma:deploy', '--prefix', 'backend']);
-run('validate deterministic seed script', 'npm', ['run', 'seed:check', '--prefix', 'backend']);
-run('seed deterministic test fixtures', 'npm', ['run', 'seed', '--prefix', 'backend']);
+run('generate Prisma clients', 'npm', ['run', 'prisma:generate']);
+run('deploy all service migrations', 'npm', ['run', 'prisma:deploy']);
+run('validate deterministic seed script', 'npm', ['run', 'seed:check']);
+run('seed deterministic test fixtures', 'npm', ['run', 'seed']);
 run('DB-backed release smoke tests', 'npm', [
   'exec',
-  '--prefix',
-  'backend',
   '--',
   'vitest',
   'run',
