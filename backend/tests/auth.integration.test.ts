@@ -94,7 +94,7 @@ describe.sequential('authentication HTTP integration', () => {
         password,
         firstName: 'Integration',
         lastName: 'User',
-        role: 'student',
+        role: 'user',
       });
 
     expect(response.status).toBe(201);
