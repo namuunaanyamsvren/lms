@@ -51,30 +51,15 @@ CREATE TABLE IF NOT EXISTS "ScholarshipRequestHistory" (
   CONSTRAINT "ScholarshipRequestHistory_pkey" PRIMARY KEY ("id")
 );
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'DocumentRequestHistory_requestId_fkey'
-  ) THEN
-    ALTER TABLE "DocumentRequestHistory"
-      ADD CONSTRAINT "DocumentRequestHistory_requestId_fkey"
-      FOREIGN KEY ("requestId") REFERENCES "DocumentRequest"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
+ALTER TABLE "DocumentRequestHistory"
+  ADD CONSTRAINT "DocumentRequestHistory_requestId_fkey"
+  FOREIGN KEY ("requestId") REFERENCES "DocumentRequest"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'ScholarshipRequestHistory_requestId_fkey'
-  ) THEN
-    ALTER TABLE "ScholarshipRequestHistory"
-      ADD CONSTRAINT "ScholarshipRequestHistory_requestId_fkey"
-      FOREIGN KEY ("requestId") REFERENCES "ScholarshipRequest"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END $$;
+ALTER TABLE "ScholarshipRequestHistory"
+  ADD CONSTRAINT "ScholarshipRequestHistory_requestId_fkey"
+  FOREIGN KEY ("requestId") REFERENCES "ScholarshipRequest"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE INDEX IF NOT EXISTS "DocumentRequest_organizationId_status_idx" ON "DocumentRequest"("organizationId", "status");
 CREATE INDEX IF NOT EXISTS "ScholarshipRequest_organizationId_status_idx" ON "ScholarshipRequest"("organizationId", "status");

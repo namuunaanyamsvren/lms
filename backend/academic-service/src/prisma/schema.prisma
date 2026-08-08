@@ -340,6 +340,7 @@ model Course {
   @@index([organizationId, status])
   @@index([organizationId, departmentId])
   @@index([organizationId, programId])
+  @@index([organizationId, currency])
   @@index([instructorId])
   @@index([organizationId, deletedAt])
 }
@@ -532,6 +533,7 @@ model Cohort {
   attendances Attendance[]
 
   @@index([organizationId])
+  @@index([organizationId, status])
   @@index([courseId])
   @@index([termId])
 }
@@ -553,6 +555,7 @@ model Enrollment {
 
   @@unique([organizationId, userId, cohortId])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@index([userId])
   @@index([cohortId])
 }
@@ -987,7 +990,6 @@ model Certificate {
   // (`Certificate_active_unique`, WHERE "revokedAt" IS NULL) is added via raw
   // SQL in the migration instead, since Prisma's schema DSL can't express a
   // filtered unique index. issueCertificate() catches that constraint's P2002.
-  @@unique([organizationId, studentId, courseId, revokedAt])
   @@index([organizationId])
   @@index([studentId])
   @@index([courseId])
@@ -1132,7 +1134,7 @@ model ConsentAcknowledgement {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  @@unique([consentFormId, studentUserId, parentUserId])
+  @@unique([consentFormId, studentUserId, parentUserId], map: "ConsentAcknowledgement_consentFormId_studentUserId_parentU_key")
   @@index([organizationId, status])
   @@index([studentUserId])
   @@index([parentUserId])
@@ -1186,7 +1188,7 @@ model AnnouncementReadReceipt {
   userId         String
   readAt         DateTime     @default(now())
 
-  @@unique([organizationId, announcementId, userId])
+  @@unique([organizationId, announcementId, userId], map: "AnnouncementReadReceipt_organizationId_announcementId_userId_ke")
   @@index([organizationId, announcementId])
   @@index([organizationId, userId])
 }

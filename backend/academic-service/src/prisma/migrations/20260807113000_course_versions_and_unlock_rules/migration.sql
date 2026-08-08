@@ -19,14 +19,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "CourseVersion_organizationId_courseId_version
 CREATE INDEX IF NOT EXISTS "CourseVersion_organizationId_courseId_publishedAt_idx"
   ON "CourseVersion"("organizationId", "courseId", "publishedAt");
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'CourseVersion_courseId_fkey'
-  ) THEN
-    ALTER TABLE "CourseVersion"
-      ADD CONSTRAINT "CourseVersion_courseId_fkey"
-      FOREIGN KEY ("courseId") REFERENCES "Course"("id")
-      ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END $$;
+ALTER TABLE "CourseVersion"
+  ADD CONSTRAINT "CourseVersion_courseId_fkey"
+  FOREIGN KEY ("courseId") REFERENCES "Course"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
