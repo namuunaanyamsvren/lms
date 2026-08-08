@@ -50,7 +50,16 @@ jobs:
           --health-retries 24
     env:
       NODE_ENV: test
+      CI: true
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=auth
+      AUTH_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=auth
+      ORGANIZATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=organization
+      ACADEMIC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=academic
+      BILLING_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=billing
+      NOTIFICATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=notification
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=shadow
+      MIGRATION_DATABASE_NAME: lms_test
+      SHADOW_DATABASE_NAME: lms_test
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       REDIS_URL: redis://localhost:6379
@@ -60,6 +69,23 @@ jobs:
       SERVICE_TOKEN_SECRET: test-service-secret-with-at-least-forty-three-characters
       CSRF_SECRET: test-csrf-secret-with-at-least-forty-three-characters
       PHONE_OTP_HASH_SECRET: test-phone-secret-with-at-least-forty-three-characters
+      GOOGLE_CLIENT_ID: security-ci.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: security-ci-google-secret
+      GOOGLE_REDIRECT_URI: http://localhost:5173/auth/callback
+      ALLOWED_ORIGINS: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
+      PROVIDER_WEBHOOK_SECRET: security-ci-provider-webhook-secret
+      QPAY_API_URL: https://qpay-ci.example.test
+      QPAY_CLIENT_ID: security-ci-qpay-client
+      QPAY_CLIENT_SECRET: security-ci-qpay-secret
+      QPAY_WEBHOOK_SECRET: security-ci-qpay-webhook-secret
+      QPAY_CALLBACK_URL: http://localhost:8080/api/v1/billing/qpay/webhook
+      SMS_PROVIDER: mock
+      SMS_PROVIDER_URL: https://sms-ci.example.test/send
+      SMS_PROVIDER_TOKEN: security-ci-sms-token
+      WEB_PUSH_PROVIDER_URL: https://push-ci.example.test
+      WEB_PUSH_PROVIDER_TOKEN: security-ci-push-token
+      SENTRY_DSN: https://public@example.com/1
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -73,14 +99,18 @@ jobs:
         run: |
           npm ci --prefix backend
           npm ci --prefix frontend
+      - name: Wait for infrastructure readiness
+        run: |
+          node -e "const net=require('node:net'); const targets=[['postgres',5432],['redis',6379],['rabbitmq',5672]]; const wait=([name,port])=>new Promise((resolve,reject)=>{let tries=0; const attempt=()=>{const socket=net.connect(port,'127.0.0.1'); socket.setTimeout(1000); socket.on('connect',()=>{socket.end(); console.log(name,'ready'); resolve();}); socket.on('error',retry); socket.on('timeout',()=>{socket.destroy(); retry();}); function retry(){if(++tries>60) reject(new Error(name+' not ready on '+port)); else setTimeout(attempt,1000);}}; attempt();}); Promise.all(targets.map(wait)).catch(error=>{console.error(error); process.exit(1);});"
+          printf 'SELECT 1;' | npm exec --prefix backend -- prisma db execute --url "$DATABASE_URL" --stdin
+          node -e "const Redis=require('./backend/node_modules/ioredis'); const redis=new Redis(process.env.REDIS_URL); redis.ping().then(value=>{console.log('redis ping',value); return redis.quit();}).catch(error=>{console.error(error); process.exit(1);});"
+          node -e "const amqp=require('./backend/node_modules/amqplib'); amqp.connect(process.env.RABBITMQ_URL).then(async conn=>{console.log('rabbitmq connected'); await conn.close();}).catch(error=>{console.error(error); process.exit(1);});"
       - name: Generate clients and deploy test schemas
         run: |
           npm run prisma:generate --prefix backend
           npm run prisma:deploy --prefix backend
       - name: Migration drift check
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d lms_test -c "CREATE DATABASE lms_migration_shadow;"
-          npm run prisma:check-drift --prefix backend
+        run: npm run prisma:check-drift --prefix backend
       - name: Build backend and frontend
         run: |
           npm run build --prefix backend
@@ -125,6 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v6
       - uses: actions/dependency-review-action@v5
