@@ -1,0 +1,88 @@
+# Production overlay: the frontend ingress is published and proxies /api to the
+# gateway. Infrastructure and service ports stay on the private Compose network.
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+        VITE_TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:?Production tenant base domain is required}
+        VITE_ENABLE_DEMO_LOGIN: "false"
+    image: lms-frontend:production
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    ports:
+      - "${FRONTEND_HTTP_PORT:-8080}:8080"
+    environment:
+      API_UPSTREAM: http://gateway:8000
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - lms-network
+
+  gateway:
+    environment:
+      NODE_ENV: production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Production CORS allowlist is required}
+      REQUIRE_INTERNAL_TLS: "true"
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?Production TLS auth service URL is required}
+      ORGANIZATION_SERVICE_URL: ${ORGANIZATION_SERVICE_URL:?Production TLS organization service URL is required}
+      ACADEMIC_SERVICE_URL: ${ACADEMIC_SERVICE_URL:?Production TLS academic service URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?Production TLS billing service URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?Production TLS notification service URL is required}
+  auth-service:
+    environment:
+      NODE_ENV: production
+      REQUIRE_INTERNAL_TLS: "true"
+      DATABASE_URL: ${AUTH_DATABASE_URL:?Production TLS auth database URL is required}
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?Production TLS RabbitMQ URL is required}
+      ORGANIZATION_SERVICE_URL: ${ORGANIZATION_SERVICE_URL:?Production TLS organization service URL is required}
+  organization-service:
+    environment:
+      NODE_ENV: production
+      REQUIRE_INTERNAL_TLS: "true"
+      DATABASE_URL: ${ORGANIZATION_DATABASE_URL:?Production TLS organization database URL is required}
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?Production TLS RabbitMQ URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?Production TLS auth service URL is required}
+      ACADEMIC_SERVICE_URL: ${ACADEMIC_SERVICE_URL:?Production TLS academic service URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?Production TLS billing service URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?Production TLS notification service URL is required}
+  academic-service:
+    environment:
+      NODE_ENV: production
+      REQUIRE_INTERNAL_TLS: "true"
+      DATABASE_URL: ${ACADEMIC_DATABASE_URL:?Production TLS academic database URL is required}
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?Production TLS RabbitMQ URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?Production TLS auth service URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?Production TLS billing service URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?Production TLS notification service URL is required}
+      MALWARE_SCAN_MODE: required
+      MALWARE_SCANNER_URL: ${MALWARE_SCANNER_URL:?Production malware scanner URL is required}
+      FILE_SIGNING_SECRET: ${FILE_SIGNING_SECRET:?Production file signing secret is required}
+      FILE_DOWNLOAD_BASE_URL: ${FILE_DOWNLOAD_BASE_URL:?Production signed download URL is required}
+      FILE_STORAGE_DIRECTORY: ${FILE_STORAGE_DIRECTORY:-/data/private-uploads}
+      FILE_STORAGE_AT_REST_ENCRYPTED: "true"
+  billing-service:
+    environment:
+      NODE_ENV: production
+      REQUIRE_INTERNAL_TLS: "true"
+      DATABASE_URL: ${BILLING_DATABASE_URL:?Production TLS billing database URL is required}
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?Production TLS RabbitMQ URL is required}
+  notification-service:
+    environment:
+      NODE_ENV: production
+      REQUIRE_INTERNAL_TLS: "true"
+      DATABASE_URL: ${NOTIFICATION_DATABASE_URL:?Production TLS notification database URL is required}
+      REDIS_URL: ${REDIS_URL:?Production TLS Redis URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?Production TLS RabbitMQ URL is required}

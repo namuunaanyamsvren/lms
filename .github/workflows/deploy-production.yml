@@ -1,0 +1,54 @@
+name: Promote production images
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: >-
+          Full git SHA whose images were already built, Trivy-scanned, and
+          pushed by container-images.yml on main. Verified against GHCR
+          before promotion.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - auth-service
+          - organization-service
+          - academic-service
+          - billing-service
+          - notification-service
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the requested SHA was built and scanned
+        run: |
+          docker manifest inspect \
+            ghcr.io/${{ github.repository_owner }}/lms-${{ matrix.service }}:sha-${{ inputs.image_sha }}
+
+      - name: Point :production at the verified image
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/lms-${{ matrix.service }}:production \
+            ghcr.io/${{ github.repository_owner }}/lms-${{ matrix.service }}:sha-${{ inputs.image_sha }}

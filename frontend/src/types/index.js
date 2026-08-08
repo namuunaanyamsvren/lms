@@ -19,4 +19,6 @@ export const UserRoles = {
   ORG_ADMIN: 'ORG_ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN',
   PRINCIPAL: 'PRINCIPAL',
+  FINANCE: 'FINANCE',
 };
+

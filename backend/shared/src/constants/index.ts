@@ -4,6 +4,7 @@ export enum UserRole {
   INSTRUCTOR = 'INSTRUCTOR',
   STUDENT = 'STUDENT',
   PARENT = 'PARENT',
+  FINANCE = 'FINANCE',
 }
 
 export enum SubscriptionTier {
@@ -34,3 +35,6 @@ export const HTTP_STATUS = {
   CONFLICT: 409,
   INTERNAL_SERVER_ERROR: 500,
 } as const;
+
+export * from './events';
+export * from './roles';

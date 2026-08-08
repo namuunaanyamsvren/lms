@@ -1,16 +1,49 @@
-# React + Vite
+# EduPulse LMS Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the multi-tenant LMS SaaS platform. The app is built
+for Mongolian schools and training organizations, with role-specific workspaces
+for organization admins, principals, teachers, students, parents, staff, and
+finance users.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
 
-## React Compiler
+The Vite dev server proxies `/api` to `VITE_GATEWAY_TARGET`, which defaults to
+`http://127.0.0.1:8000`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Production build
 
-## Expanding the ESLint configuration
+```bash
+npm run build
+npm run preview
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Production containers serve the compiled SPA through nginx, cache static assets,
+return `index.html` for client-side routes, expose `/health`, and proxy `/api`
+to the backend gateway.
+
+```bash
+docker build -t lms-frontend:production .
+docker run --rm -p 8080:8080 -e API_UPSTREAM=http://host.docker.internal:8000 lms-frontend:production
+```
+
+## Required runtime model
+
+- Browser talks to `/api/v1`; frontend does not store refresh tokens.
+- Refresh session is held by secure HTTP-only cookies from the auth service.
+- Demo login stays disabled unless `VITE_ENABLE_DEMO_LOGIN=true` is explicitly
+  set for a local demo environment.
+- Tenant slug examples use lowercase Latin text, such as `mongol-erdem`.
+
+## Quality gates
+
+```bash
+npm run test
+npm run build
+npm run test:e2e
+```

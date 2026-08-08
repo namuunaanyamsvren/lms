@@ -1,141 +1,282 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+import {
+  authRequest,
+  resetAuthFailureState,
+  requestAccessTokenRefresh,
+  setAuthFailureHandler,
+} from '../services/apiClient';
+import {
+  authenticateWithCredentials,
+  authenticateWithGoogleCode,
+  clearBrowserSessionFlag,
+  fetchCurrentUser,
+  restoreSessionOnce,
+} from '../services/authSession';
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+  subscribeAccessToken,
+} from '../services/tokenStore';
+import {
+  clearSilentRefreshTimer,
+  startSilentRefreshScheduler,
+  stopSilentRefreshScheduler,
+} from '../services/silentRefreshScheduler';
 
 const AuthContext = createContext(null);
-const API_URL = 'http://localhost:8001/api/auth';
+const getRequestErrorMessage = error =>
+  error.response?.data?.message || error.message || 'Authentication failed';
 
 export const getRoleRedirectPath = (roleStr) => {
-  if (!roleStr) return '/student';
+  if (!roleStr) return '/user';
   const role = roleStr.toLowerCase();
+  if (role === 'user') return '/user';
+  if (role === 'student') return '/student';
   if (role === 'teacher' || role === 'instructor') return '/teacher';
   if (role === 'admin' || role === 'org_admin' || role === 'super_admin') return '/admin';
   if (role === 'parent') return '/parent';
   if (role === 'staff') return '/staff';
   if (role === 'principal') return '/principal';
-  return '/student';
+  // Finance/billing is outside the MVP; keep the role compatible but expose no placeholder UI.
+  if (role === 'finance') return '/profile';
+  return '/user';
 };
+const getAuthenticatedRedirectPath = user =>
+  user?.emailVerificationRequired
+    ? '/verify-email'
+    : user?.phoneVerificationRequired
+      ? '/verify-phone'
+      : user?.verificationRequired
+        ? '/verify-email'
+        : getRoleRedirectPath(user?.role);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('lms_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('lms_token') || null);
+  const [user, setUser] = useState(null);
+  const [token, setTokenState] = useState(() => getAccessToken());
+  const [authStatus, setAuthStatus] = useState('loading');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('lms_token', token);
-    } else {
-      localStorage.removeItem('lms_token');
-    }
-  }, [token]);
+    localStorage.removeItem('lms_token');
+    localStorage.removeItem('lms_user');
+    return subscribeAccessToken(nextToken => {
+      setTokenState(nextToken);
+      if (!nextToken) {
+        setUser(null);
+        setAuthStatus(current =>
+          current === 'loading' ? current : 'unauthenticated');
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('lms_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('lms_user');
-    }
-  }, [user]);
+    startSilentRefreshScheduler();
+    return stopSilentRefreshScheduler;
+  }, []);
 
-  const safeFetchJsonWithTimeout = async (url, options, timeoutMs = 5000) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
+  useEffect(() => {
+    let active = true;
+    restoreSessionOnce()
+      .then(session => {
+        if (!active) return;
+        setUser(session.user);
+        setAuthStatus('authenticated');
+      })
+      .catch(() => {
+        if (!active) return;
+        clearAccessToken();
+        setUser(null);
+        setAuthStatus('unauthenticated');
       });
-      clearTimeout(timer);
-
-      const contentType = response.headers.get('content-type');
-      let data;
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(`Server returned non-JSON response (${response.status}): ${text.slice(0, 100)}`);
-      }
-
-      if (!response.ok || !data.success) {
-        throw new Error(data?.message || `Серверийн алдаа (${response.status})`);
-      }
-      return data;
-    } catch (err) {
-      clearTimeout(timer);
-      if (err.name === 'AbortError') {
-        throw new Error('Backend сервертэй холбогдоход хугацаа хэтэрлээ');
-      }
-      throw err;
-    }
-  };
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const login = async ({ identifier, email, password, organizationId }) => {
     setLoading(true);
     setError(null);
     const loginIdentifier = identifier || email;
     try {
-      const data = await safeFetchJsonWithTimeout(`${API_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: loginIdentifier,
-          email: loginIdentifier,
-          password,
-          organizationId,
-        }),
+      const session = await authenticateWithCredentials('/auth/login', {
+        identifier: loginIdentifier,
+        email: loginIdentifier,
+        password,
+        organizationId,
       });
 
-      setToken(data.data.token);
-      setUser(data.data.user);
-      setLoading(false);
+      resetAuthFailureState();
+      setUser(session.user);
+      setAuthStatus('authenticated');
       return {
         success: true,
-        user: data.data.user,
-        redirectPath: getRoleRedirectPath(data.data.user.role),
+        user: session.user,
+        redirectPath: getAuthenticatedRedirectPath(session.user),
       };
     } catch (err) {
-      setLoading(false);
-      setError(err.message);
+      clearAccessToken();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      const message = getRequestErrorMessage(err);
+      setError(message);
       return {
         success: false,
-        message: err.message,
+        message,
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const register = async ({ email, username, phone, password, firstName, lastName, role = 'student', organizationId }) => {
+  const register = async ({ email, username, phone, password, firstName, lastName, role = 'user', organizationId }) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await safeFetchJsonWithTimeout(`${API_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username, phone, password, firstName, lastName, role, organizationId }),
+      const session = await authenticateWithCredentials('/auth/register', {
+        email,
+        username,
+        phone,
+        password,
+        firstName,
+        lastName,
+        role,
+        organizationId,
       });
 
-      setToken(data.data.token);
-      setUser(data.data.user);
-      setLoading(false);
-      return { success: true, user: data.data.user, redirectPath: getRoleRedirectPath(data.data.user.role) };
+      resetAuthFailureState();
+      setUser(session.user);
+      setAuthStatus('authenticated');
+      return {
+        success: true,
+        user: session.user,
+        redirectPath: getAuthenticatedRedirectPath(session.user),
+      };
     } catch (err) {
-      setLoading(false);
-      setError(err.message);
+      clearAccessToken();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      const message = getRequestErrorMessage(err);
+      setError(message);
       return {
         success: false,
-        message: err.message,
+        message,
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    setToken(null);
+  const completeGoogleLogin = useCallback(async code => {
+    setLoading(true);
+    setError(null);
+    try {
+      const session = await authenticateWithGoogleCode(code);
+      resetAuthFailureState();
+      setUser(session.user);
+      setAuthStatus('authenticated');
+      return {
+        success: true,
+        user: session.user,
+        redirectPath: getAuthenticatedRedirectPath(session.user),
+      };
+    } catch (err) {
+      clearAccessToken();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      const message = getRequestErrorMessage(err);
+      setError(message);
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const clearLocalSession = useCallback(() => {
+    clearSilentRefreshTimer();
+    clearAccessToken();
+    clearBrowserSessionFlag();
     setUser(null);
-    localStorage.removeItem('lms_token');
+    setAuthStatus('unauthenticated');
     localStorage.removeItem('lms_user');
-  };
+  }, []);
+
+  const logout = useCallback(() => {
+    const revokeRequest = authRequest({
+      url: '/auth/logout',
+      method: 'POST',
+    }).catch(() => undefined);
+    clearLocalSession();
+    return revokeRequest;
+  }, [clearLocalSession]);
+
+  const completeEmailVerification = useCallback(async () => {
+    const refreshedToken = await requestAccessTokenRefresh();
+    const authoritativeUser = await fetchCurrentUser(refreshedToken);
+    setUser(authoritativeUser);
+    setAuthStatus('authenticated');
+    return {
+      user: authoritativeUser,
+      redirectPath: getAuthenticatedRedirectPath(authoritativeUser),
+    };
+  }, []);
+  const completePhoneVerification = completeEmailVerification;
+
+  const refreshUser = useCallback(async () => {
+    const authoritativeUser = await fetchCurrentUser(token);
+    setUser(authoritativeUser);
+    return authoritativeUser;
+  }, [token]);
+
+  const switchOrganization = useCallback(async (organizationId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await authRequest({
+        url: '/auth/switch-organization',
+        method: 'POST',
+        data: { organizationId },
+      });
+      const nextToken = response?.data?.token;
+      if (!nextToken) throw new Error('Organization switch response did not include an access token');
+      setAccessToken(nextToken);
+      const nextUser = response.data.user || await fetchCurrentUser(nextToken);
+      setUser(nextUser);
+      setAuthStatus('authenticated');
+      return {
+        success: true,
+        user: nextUser,
+        redirectPath: getAuthenticatedRedirectPath(nextUser),
+      };
+    } catch (err) {
+      const message = getRequestErrorMessage(err);
+      setError(message);
+      return {
+        success: false,
+        message,
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearLocalSession();
+      if (window.location.pathname !== '/login') window.location.assign('/login?reason=session-expired');
+    };
+    setAuthFailureHandler(handleUnauthorized);
+    return () => {
+      setAuthFailureHandler(null);
+    };
+  }, [clearLocalSession]);
 
   return (
     <AuthContext.Provider
@@ -143,12 +284,20 @@ export function AuthProvider({ children }) {
         user,
         token,
         role: user?.role || null,
+        authStatus,
+        isBootstrapping: authStatus === 'loading',
+        isAuthenticated: authStatus === 'authenticated' && Boolean(token && user),
         loading,
         error,
         login,
         register,
+        completeGoogleLogin,
         logout,
+        completeEmailVerification,
+        completePhoneVerification,
         getRoleRedirectPath,
+        refreshUser,
+        switchOrganization,
       }}
     >
       {children}

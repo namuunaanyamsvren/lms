@@ -1,22 +1,12 @@
-import { Settings as SettingsIcon, User, Bell, Moon, Shield, ChevronDown } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
 import { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { getRoleRedirectPath } from '../../context/AuthContext';
 
 export default function SettingsDropdown({ onNavigate, className = '' }) {
   const [open, setOpen] = useState(false);
-  const { user } = useAuth();
-
-  const getRolePath = (path) => {
-    const basePath = getRoleRedirectPath(user?.role);
-    return `${basePath}${path}`;
-  };
-
   const menuItems = [
-    { icon: User, label: 'Profile Settings', action: () => onNavigate?.(getRolePath('/settings/profile')) },
-    { icon: Bell, label: 'Notification Settings', action: () => onNavigate?.(getRolePath('/settings/notifications')) },
-    { icon: Moon, label: 'Appearance', action: () => onNavigate?.(getRolePath('/settings/appearance')) },
-    { icon: Shield, label: 'Security', action: () => onNavigate?.(getRolePath('/settings/security')) },
+    { icon: User, label: 'Profile Settings', action: () => onNavigate?.('/profile') },
+    { icon: Bell, label: 'Notification Settings', action: () => onNavigate?.('/profile') },
+    { icon: Shield, label: 'Security', action: () => onNavigate?.('/settings/security') },
   ];
 
   return (

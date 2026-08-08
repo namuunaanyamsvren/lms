@@ -1,19 +1,99 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
+import {
+  applyHttpSecurity,
+  asyncHandler,
+  createLogger,
+  errorHandler,
+  internalServiceAuth,
+  notFoundHandler,
+  rabbitMQDependency,
+  redisDependency,
+  registerHealthRoutes,
+  requestIdMiddleware,
+  requestLogger,
+  tracingMiddleware,
+  requireInternalService,
+  applyCors,
+  startServiceRuntime,
+  validateErrorMonitoringEnvironment,
+  validateServiceEnvironment,
+} from '@lms/shared';
+import routes from './routes';
+import { startOrganizationCreatedConsumer } from './events/organization-created.consumer';
+import { startEnrollmentCreatedConsumer } from './events/enrollment-created.consumer';
+import { startBillingOutboxPublisher } from './services/event-outbox.service';
+import { startBillingEventReconciliation } from './services/event-reconciliation.service';
+import { startBillingReminderScheduler } from './services/reminder-scheduler.service';
+import { deactivateOrganizationBilling, getAccessStatus, getRevenueSummary } from './controllers/internal.controller';
+import { handleQPayWebhook } from './controllers/billing.controller';
+import { validateQPayConfiguration } from './services/qpay-provider.service';
+import { prisma } from './lib/prisma';
 
 dotenv.config();
 
 const app = express();
+const logger = createLogger('billing-service');
+validateServiceEnvironment('billing');
+validateErrorMonitoringEnvironment();
+validateQPayConfiguration();
 const PORT = process.env.PORT || 8004;
 
-app.use(cors());
-app.use(express.json());
+app.use(requestIdMiddleware);
+app.use(tracingMiddleware('billing-service'));
+app.use(requestLogger);
+applyCors(app);
+applyHttpSecurity(app);
+app.use(express.json({ limit: '1mb' }));
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'billing-service', timestamp: new Date() });
-});
+app.post('/api/payments/qpay/webhook', asyncHandler(handleQPayWebhook));
 
-app.listen(PORT, () => {
-  console.log(`[Billing Service] Running on port ${PORT}`);
+app.delete(
+  '/internal/organizations/:organizationId',
+  internalServiceAuth,
+  requireInternalService('organization-service'),
+  asyncHandler(deactivateOrganizationBilling),
+);
+app.get(
+  '/internal/organizations/:organizationId/revenue-summary',
+  internalServiceAuth,
+  requireInternalService('academic-service'),
+  asyncHandler(getRevenueSummary),
+);
+app.get(
+  '/internal/organizations/:organizationId/access-status',
+  internalServiceAuth,
+  requireInternalService('academic-service'),
+  asyncHandler(getAccessStatus),
+);
+app.use('/api/payments', routes);
+
+const runtimeDependencies = [redisDependency(false), rabbitMQDependency(false)];
+registerHealthRoutes(app, 'billing-service', runtimeDependencies);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+startServiceRuntime({
+  app,
+  serviceName: 'billing-service',
+  port: PORT,
+  logger,
+  prisma,
+  dependencies: runtimeDependencies,
+  registerHealth: false,
+  startWorkers: () => {
+    Promise.all([
+      startOrganizationCreatedConsumer(),
+      startEnrollmentCreatedConsumer(),
+    ]).catch(error => {
+      logger.error('Billing consumers failed to start', { error: String(error) });
+    });
+    startBillingOutboxPublisher();
+    startBillingEventReconciliation();
+    startBillingReminderScheduler();
+  },
+}).catch(error => {
+  logger.error('Billing Service failed to start', { error: String(error) });
+  process.exit(1);
 });

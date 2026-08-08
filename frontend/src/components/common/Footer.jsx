@@ -62,14 +62,14 @@ export default function Footer() {
         <div className="mt-10 border-t border-slate-200 pt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between text-sm text-slate-500">
           <p>&copy; {currentYear} LMS. Бүх эрх хуулиар хамгаалагдсан.</p>
           <div className="flex flex-wrap gap-4">
-            <a href="#" className="hover:text-slate-900">
-              Twitter
+            <a href="/privacy" className="hover:text-slate-900">
+              Нууцлал
             </a>
-            <a href="#" className="hover:text-slate-900">
-              LinkedIn
+            <a href="/terms" className="hover:text-slate-900">
+              Нөхцөл
             </a>
-            <a href="#" className="hover:text-slate-900">
-              GitHub
+            <a href="/minor-privacy" className="hover:text-slate-900">
+              Хүүхдийн нууцлал
             </a>
           </div>
         </div>
@@ -77,7 +77,6 @@ export default function Footer() {
     </footer>
   );
 }
-
 
 
 

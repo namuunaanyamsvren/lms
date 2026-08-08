@@ -5,24 +5,13 @@ export const registerSchema = z.object({
   email: z.string().email('Хүчинтэй имэйл хаяг оруулна уу'),
   username: z.string().optional(),
   phone: z.string().optional(),
-  password: z.string().min(6, 'Нууц үг хамгийн багадаа 6 тэмдэгт байх ёстой'),
+  password: z.string().min(1, 'Нууц үг оруулна уу').max(128, 'Нууц үг хэт урт байна'),
   firstName: z.string().min(1, 'Нэр оруулна уу'),
   lastName: z.string().min(1, 'Овог оруулна уу'),
-  role: z.enum([
-    'SUPER_ADMIN',
-    'ORG_ADMIN',
-    'INSTRUCTOR',
-    'STUDENT',
-    'PARENT',
-    'STAFF',
-    'PRINCIPAL',
-    'teacher',
-    'student',
-    'admin',
-    'parent',
-    'staff',
-    'principal',
-  ]).default('STUDENT'),
+  // Privileged roles are provisioned by onboarding/admin flows, never by a
+  // public self-registration request.
+  role: z.enum(['USER', 'PARENT', 'user', 'parent']).default('USER'),
+  invitationCode:z.string().min(8).max(100).optional(),
 });
 
 export const loginSchema = z.object({
@@ -49,7 +38,12 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'token шаардлагатай'),
-  newPassword: z.string().min(6, 'Нууц үг хамгийн багадаа 6 тэмдэгт байх ёстой'),
+  newPassword: z.string().min(1, 'Нууц үг оруулна уу').max(128, 'Нууц үг хэт урт байна'),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Одоогийн нууц үг оруулна уу').max(128),
+  newPassword: z.string().min(1, 'Шинэ нууц үг оруулна уу').max(128, 'Нууц үг хэт урт байна'),
 });
 
 export const sendVerificationSchema = z.object({
@@ -58,4 +52,8 @@ export const sendVerificationSchema = z.object({
 
 export const verifyTokenSchema = z.object({
   token: z.string().min(1, 'token шаардлагатай'),
+});
+
+export const verifyPhoneSchema = z.object({
+  otp: z.string().regex(/^\d{6,8}$/, 'Баталгаажуулах кодын формат буруу байна.'),
 });

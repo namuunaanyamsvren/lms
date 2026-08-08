@@ -1,4 +1,4 @@
-import { Search, Bell, Settings } from 'lucide-react';
+import { Search, Settings } from 'lucide-react';
 
 export default function Topbar({
   title,

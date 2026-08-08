@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:00"
+    open-pull-requests-limit: 10
+    groups:
+      production-security:
+        dependency-type: production
+        update-types: [patch, minor]
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:15"
+    open-pull-requests-limit: 10
+    groups:
+      production-security:
+        dependency-type: production
+        update-types: [patch, minor]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:30"

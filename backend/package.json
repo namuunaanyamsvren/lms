@@ -2,6 +2,9 @@
   "name": "@lms/backend-root",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "workspaces": [
     "shared",
     "gateway",
@@ -13,20 +16,43 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "lint": "eslint . --ext .ts",
+    "test": "vitest run",
+    "test:smoke:db": "node scripts/real-db-smoke.js",
+    "test:watch": "vitest",
+    "lint": "eslint .",
     "format": "prettier --write \"**/*.ts\"",
     "prisma:generate": "npm run prisma:generate --workspaces --if-present",
+    "prisma:deploy": "node scripts/prisma-deploy-all.js",
+    "prisma:baseline-legacy": "node scripts/prisma-deploy-all.js --baseline-legacy",
+    "prisma:check-drift": "node scripts/check-migration-drift.js",
+    "openapi:export": "node scripts/export-openapi.js",
+    "openapi:inventory": "node scripts/devex/generate-route-inventory.js",
+    "openapi:validate": "npm run openapi:inventory && node scripts/devex/validate-openapi-coverage.js",
+    "api:types": "npm run openapi:inventory && node scripts/devex/generate-api-client-types.js",
+    "production:validate": "npm run build --workspace=shared && node scripts/validate-production-readiness.js",
     "seed": "node scripts/seed-dev.js",
-    "docker:up": "docker-compose up --build",
-    "docker:down": "docker-compose down"
+    "seed:check": "node --check scripts/seed-dev.js",
+    "db:backup:start": "docker compose -f docker-compose.yml -f docker-compose.development.yml --profile backup up -d postgres postgres-backup",
+    "db:backup:once": "docker compose -f docker-compose.yml -f docker-compose.development.yml run --rm --entrypoint /usr/local/bin/backup-once.sh postgres-backup",
+    "db:restore-drill": "docker compose -f docker-compose.yml -f docker-compose.development.yml run --rm postgres-restore-drill",
+    "nonfunctional:resilience": "node scripts/nonfunctional/resilience-check.js",
+    "nonfunctional:k6": "k6 run performance/k6/lms-nonfunctional.js",
+    "events:ops": "node scripts/event-ops.js",
+    "perf:smoke": "node scripts/performance-benchmark.js",
+    "docker:up": "docker compose -f docker-compose.yml -f docker-compose.development.yml up --build",
+    "docker:down": "docker compose -f docker-compose.yml -f docker-compose.development.yml down"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/supertest": "^6.0.3",
     "@types/winston": "^2.4.4",
-    "@typescript-eslint/eslint-plugin": "^6.16.0",
-    "@typescript-eslint/parser": "^6.16.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.8.0",
     "prettier": "^3.1.1",
-    "typescript": "^5.3.3"
+    "supertest": "^7.2.2",
+    "typescript-eslint": "^8.65.0",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

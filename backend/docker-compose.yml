@@ -1,19 +1,80 @@
-version: '3.8'
-
 services:
   # Infrastructure Services
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: ./config/postgres
+    image: lms-postgres-pitr:15
     container_name: lms-postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: lms_db
-    ports:
-      - "5432:5432"
+      POSTGRES_INITDB_ARGS: --data-checksums
+      POSTGRES_WAL_ARCHIVE_DIRECTORY: /var/lib/postgresql/wal-archive
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=60s
+      - -c
+      - archive_command=/usr/local/bin/archive-wal.sh %p %f
+      - -c
+      - hba_file=/etc/postgresql/lms-pg_hba.conf
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - postgres_wal_archive:/var/lib/postgresql/wal-archive
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d lms_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - lms-network
+
+  postgres-backup:
+    image: lms-postgres-pitr:15
+    build:
+      context: ./config/postgres
+    profiles: ["backup"]
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/backup-loop.sh"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: lms_db
+      POSTGRES_HOST: postgres
+      POSTGRES_BACKUP_DIRECTORY: /backups
+      POSTGRES_BACKUP_INTERVAL_SECONDS: ${POSTGRES_BACKUP_INTERVAL_SECONDS:-86400}
+      POSTGRES_BACKUP_RETENTION_DAYS: ${POSTGRES_BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lms-network
+
+  postgres-restore-drill:
+    image: lms-postgres-pitr:15
+    build:
+      context: ./config/postgres
+    profiles: ["restore-drill"]
+    entrypoint: ["/usr/local/bin/restore-drill.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: lms_db
+      POSTGRES_BACKUP_DIRECTORY: /backups
+      POSTGRES_WAL_ARCHIVE_DIRECTORY: /var/lib/postgresql/wal-archive
+      PITR_TARGET_TIME: ${PITR_TARGET_TIME:-}
+    volumes:
+      - postgres_backups:/backups:ro
+      - postgres_wal_archive:/var/lib/postgresql/wal-archive:ro
     networks:
       - lms-network
 
@@ -21,10 +82,15 @@ services:
     image: redis:7-alpine
     container_name: lms-redis
     restart: always
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     networks:
       - lms-network
 
@@ -33,13 +99,18 @@ services:
     container_name: lms-rabbitmq
     restart: always
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    expose:
+      - "5672"
+      - "15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
     networks:
       - lms-network
 
@@ -50,22 +121,37 @@ services:
       dockerfile: ./gateway/Dockerfile
     container_name: lms-gateway
     restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "8000:8000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8000
       AUTH_SERVICE_URL: http://auth-service:8001
       ORGANIZATION_SERVICE_URL: http://organization-service:8002
       ACADEMIC_SERVICE_URL: http://academic-service:8003
       BILLING_SERVICE_URL: http://billing-service:8004
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-true}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-localhost}
       NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
+      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      CSRF_HEADER_NAME: ${CSRF_HEADER_NAME:-x-csrf-token}
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - auth-service
-      - organization-service
-      - academic-service
-      - billing-service
-      - notification-service
+      auth-service:
+        condition: service_healthy
+      organization-service:
+        condition: service_healthy
+      academic-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
     networks:
       - lms-network
 
@@ -75,22 +161,51 @@ services:
       dockerfile: ./auth-service/Dockerfile
     container_name: lms-auth-service
     restart: always
-    ports:
-      - "8001:8001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "8001"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8001
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=auth
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lms_db?schema=auth
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_ACCESS_SECRET: super-secret-jwt-key
-      JWT_REFRESH_SECRET: super-secret-refresh-key
-      JWT_ACCESS_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
+      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-7d}
+      REFRESH_COOKIE_NAME: ${REFRESH_COOKIE_NAME:-lms_refresh}
+      REFRESH_COOKIE_PATH: ${REFRESH_COOKIE_PATH:-/api/auth}
+      REFRESH_COOKIE_DOMAIN: ${REFRESH_COOKIE_DOMAIN:-}
+      REFRESH_COOKIE_SAME_SITE: ${REFRESH_COOKIE_SAME_SITE:-lax}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-lms_csrf}
+      CSRF_HEADER_NAME: ${CSRF_HEADER_NAME:-x-csrf-token}
+      CSRF_SECRET: ${CSRF_SECRET:?CSRF_SECRET is required}
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:-${INTERNAL_SERVICE_KEY:?SERVICE_TOKEN_SECRET or INTERNAL_SERVICE_KEY is required}}
+      PHONE_OTP_HASH_SECRET: ${PHONE_OTP_HASH_SECRET:?PHONE_OTP_HASH_SECRET is required}
+      SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
+      SMS_PROVIDER_TIMEOUT_MS: ${SMS_PROVIDER_TIMEOUT_MS:-5000}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      PASSWORD_COMPROMISED_CHECK_ENABLED: ${PASSWORD_COMPROMISED_CHECK_ENABLED:-true}
+      PASSWORD_COMPROMISED_CHECK_FAILURE_MODE: ${PASSWORD_COMPROMISED_CHECK_FAILURE_MODE:-allow}
+      ORGANIZATION_SERVICE_URL: http://organization-service:8002
+      ACADEMIC_SERVICE_URL: http://academic-service:8003
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?GOOGLE_REDIRECT_URI is required}
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lms-network
 
@@ -100,19 +215,33 @@ services:
       dockerfile: ./organization-service/Dockerfile
     container_name: lms-organization-service
     restart: always
-    ports:
-      - "8002:8002"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "8002"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8002
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=organization
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lms_db?schema=organization
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: super-secret-jwt-key
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:-${INTERNAL_SERVICE_KEY:?SERVICE_TOKEN_SECRET or INTERNAL_SERVICE_KEY is required}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      AUTH_SERVICE_URL: http://auth-service:8001
+      ACADEMIC_SERVICE_URL: http://academic-service:8003
+      BILLING_SERVICE_URL: http://billing-service:8004
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-true}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-localhost}
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lms-network
 
@@ -122,45 +251,70 @@ services:
       dockerfile: ./academic-service/Dockerfile
     container_name: lms-academic-service
     restart: always
-    ports:
-      - "8003:8003"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "8003"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8003
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=academic
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lms_db?schema=academic
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_ACCESS_SECRET: super-secret-jwt-key
-      JWT_REFRESH_SECRET: super-secret-refresh-key
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
       AUTH_SERVICE_URL: http://auth-service:8001
       BILLING_SERVICE_URL: http://billing-service:8004
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-true}
       NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:-${INTERNAL_SERVICE_KEY:?SERVICE_TOKEN_SECRET or INTERNAL_SERVICE_KEY is required}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      FILE_SIGNING_SECRET: ${FILE_SIGNING_SECRET:-dev-only-file-signing-secret-change-before-production-2026}
+      FILE_DOWNLOAD_BASE_URL: ${FILE_DOWNLOAD_BASE_URL:-http://localhost:8000/api/uploads/download}
+      FILE_STORAGE_DIRECTORY: /data/private-uploads
+      FILE_STORAGE_AT_REST_ENCRYPTED: ${FILE_STORAGE_AT_REST_ENCRYPTED:-false}
+      MALWARE_SCAN_MODE: ${MALWARE_SCAN_MODE:-disabled}
+      MALWARE_SCANNER_URL: ${MALWARE_SCANNER_URL:-}
+    volumes:
+      - academic_uploads:/data/private-uploads
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lms-network
 
   billing-service:
+    profiles: ["billing"]
     build:
       context: .
       dockerfile: ./billing-service/Dockerfile
     container_name: lms-billing-service
     restart: always
-    ports:
-      - "8004:8004"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "8004"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8004
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=billing
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lms_db?schema=billing
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: super-secret-jwt-key
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:-${INTERNAL_SERVICE_KEY:?SERVICE_TOKEN_SECRET or INTERNAL_SERVICE_KEY is required}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lms-network
 
@@ -170,26 +324,42 @@ services:
       dockerfile: ./notification-service/Dockerfile
     container_name: lms-notification-service
     restart: always
-    ports:
-      - "8005:8005"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "8005"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 8005
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/lms_db?schema=notification
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lms_db?schema=notification
       REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: super-secret-jwt-key
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:-${INTERNAL_SERVICE_KEY:?SERVICE_TOKEN_SECRET or INTERNAL_SERVICE_KEY is required}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lms-network
 
 volumes:
   postgres_data:
+  postgres_backups:
+  postgres_wal_archive:
   redis_data:
   rabbitmq_data:
+  academic_uploads:
 
 networks:
   lms-network:

@@ -1,0 +1,2 @@
+CREATE TABLE "AuthOutboxEvent" ("id" TEXT NOT NULL,"eventType" TEXT NOT NULL,"payload" JSONB NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"publishedAt" TIMESTAMP(3),"attemptCount" INTEGER NOT NULL DEFAULT 0,"nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"lastError" TEXT,CONSTRAINT "AuthOutboxEvent_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "AuthOutboxEvent_publishedAt_nextAttemptAt_idx" ON "AuthOutboxEvent"("publishedAt","nextAttemptAt");

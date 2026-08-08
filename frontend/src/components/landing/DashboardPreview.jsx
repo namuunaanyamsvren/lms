@@ -39,13 +39,13 @@ export default function DashboardPreview() {
           <FadeContent distance={40} duration={0.8} delay={0.3} blur={true} className="relative">
             <div className="absolute inset-x-0 top-0 h-full rounded-[2rem] bg-gradient-to-br from-indigo-100/80 via-white to-slate-50 blur-3xl" />
             <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-soft">
-              <div className="bg-slate-950 px-6 py-4 text-white">
+              <div className="border-b border-indigo-100 bg-indigo-50 px-6 py-4 text-slate-900">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Ангийн гүйцэтгэл</p>
-                    <h3 className="mt-3 text-2xl font-semibold text-white">Семестрийн тойм</h3>
+                    <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Ангийн гүйцэтгэл</p>
+                    <h3 className="mt-3 text-2xl font-semibold text-slate-950">Семестрийн тойм</h3>
                   </div>
-                  <div className="rounded-2xl bg-slate-800 px-4 py-2 text-sm">Шууд</div>
+                  <div className="rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Шууд</div>
                 </div>
               </div>
               <div className="px-6 py-8">

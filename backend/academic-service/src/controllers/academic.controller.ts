@@ -1,7 +1,38 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client-academic';
+import { serviceAuthorizationHeaders } from '@lms/shared';
+import { getOrganizationBillingSummary } from '../services/organization-billing-summary.service';
+import { getOrganizationAtRiskSummary } from '../services/grade.service';
 
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
+
+type NotificationProjection = {
+  unreadCount: number;
+  items: Array<{ title: string; body: string; createdAt: string }>;
+};
+
+const getNotificationProjection = async (
+  organizationId: string,
+  userId: string,
+  limit = 5,
+): Promise<NotificationProjection> => {
+  const baseUrl = process.env.NOTIFICATION_SERVICE_URL;
+  if (!baseUrl) return { unreadCount: 0, items: [] };
+  try {
+    const response = await fetch(
+      `${baseUrl.replace(/\/+$/, '')}/internal/notifications/${encodeURIComponent(organizationId)}/${encodeURIComponent(userId)}?limit=${limit}`,
+      {
+        headers: serviceAuthorizationHeaders('academic-service'),
+        signal: AbortSignal.timeout(2_000),
+      },
+    );
+    if (!response.ok) throw new Error(`notification projection status ${response.status}`);
+    const payload = await response.json() as { data?: NotificationProjection };
+    return payload.data || { unreadCount: 0, items: [] };
+  } catch (error) {
+    console.warn('[Academic] Notification projection unavailable', error);
+    return { unreadCount: 0, items: [] };
+  }
+};
 
 // Converts a 0-100 average score into a US-style letter grade, used everywhere
 // the UI expects a letter grade (e.g. "A-") instead of a raw percentage.
@@ -38,7 +69,7 @@ export const getCourses = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { userId, role } = user!;
-    let where: any = { organizationId };
+    const where: any = { organizationId, deletedAt: null };
 
     switch (role) {
       case 'STUDENT':
@@ -47,17 +78,18 @@ export const getCourses = async (req: Request, res: Response) => {
       case 'INSTRUCTOR':
         where.instructorId = userId;
         break;
-      case 'PARENT':
+      case 'PARENT': {
         const guardian = await prisma.guardian.findFirst({
-          where: { parentUserId: userId },
-          select: { studentId: true },
+          where: { parentUserId: userId, organizationId },
+          select: { studentUserId: true },
         });
         if (guardian) {
-          where.cohorts = { some: { enrollments: { some: { userId: guardian.studentId } } } };
+          where.cohorts = { some: { enrollments: { some: { userId: guardian.studentUserId } } } };
         } else {
           return res.json({ success: true, data: [] });
         }
         break;
+      }
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
@@ -79,14 +111,36 @@ export const getCourses = async (req: Request, res: Response) => {
 export const getCourseById = async (req: Request, res: Response) => {
   try {
     const organizationId = req.organizationId!;
+    const { userId, role } = req.user!;
     const { id } = req.params;
+    let accessWhere: any = {};
+    if (role === 'STUDENT') {
+      accessWhere = { cohorts: { some: { enrollments: { some: { userId } } } } };
+    } else if (role === 'INSTRUCTOR') {
+      accessWhere = { instructorId: userId };
+    } else if (role === 'PARENT') {
+      const guardian = await prisma.guardian.findFirst({
+        where: { organizationId, parentUserId: userId },
+        select: { studentUserId: true },
+      });
+      if (!guardian) return res.status(404).json({ success: false, message: 'Хичээл олдсонгүй' });
+      accessWhere = { cohorts: { some: { enrollments: { some: { userId: guardian.studentUserId } } } } };
+    } else if (!['ORG_ADMIN', 'SUPER_ADMIN', 'PRINCIPAL', 'STAFF'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized role' });
+    }
     const course = await prisma.course.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null, ...accessWhere },
       include: {
         modules: {
           include: {
             lessons: true,
-            assignments: true,
+            assignments: {
+              where: {
+                deletedAt: null,
+                ...(['STUDENT', 'PARENT'].includes(role) ? { status: 'PUBLISHED' as const } : {}),
+              },
+              include: assignmentAttachmentInclude,
+            },
             quizzes: true,
           },
           orderBy: { order: 'asc' },
@@ -100,8 +154,9 @@ export const getCourseById = async (req: Request, res: Response) => {
     }
 
     return res.status(200).json({ success: true, data: course });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Алдаа гарлаа', error: error.message });
+  } catch (error) {
+    console.error('[getCourseById Error]', error);
+    return res.status(500).json({ success: false, message: 'Алдаа гарлаа' });
   }
 };
 
@@ -109,29 +164,70 @@ export const getCourseById = async (req: Request, res: Response) => {
 export const getCohorts = async (req: Request, res: Response) => {
   try {
     const organizationId = req.organizationId!;
+    const { role, userId } = req.user!;
+    const where: any = { organizationId };
+    if (role === 'INSTRUCTOR') where.course = { instructorId: userId };
+    else if (role === 'STUDENT') where.enrollments = { some: { userId } };
+    else if (role === 'PARENT') {
+      const guardian = await prisma.guardian.findFirst({
+        where: { organizationId, parentUserId: userId },
+        select: { studentUserId: true },
+      });
+      if (!guardian) return res.json({ success: true, data: [] });
+      where.enrollments = { some: { userId: guardian.studentUserId } };
+    } else if (!['ORG_ADMIN', 'SUPER_ADMIN', 'PRINCIPAL', 'STAFF'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized role' });
+    }
     const cohorts = await prisma.cohort.findMany({
-      where: { organizationId },
+      where,
       include: {
         course: true,
         enrollments: {
-          include: { user: true },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     return res.status(200).json({ success: true, data: cohorts });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Ангиудын жагсаалт авахад алдаа гарлаа', error: error.message });
+  } catch (error) {
+    console.error('[getCohorts Error]', error);
+    return res.status(500).json({ success: false, message: 'Ангиудын жагсаалт авахад алдаа гарлаа' });
   }
 };
+
+const attachmentSelect = {
+  id: true,
+  originalName: true,
+  mimeType: true,
+  size: true,
+  storageKey: true,
+  scanStatus: true,
+} as const;
+
+const assignmentAttachmentInclude = {
+  attachments: {
+    include: { fileAsset: { select: attachmentSelect } },
+  },
+} as const;
 
 // 3. Assignments & Submissions
 export const getAssignments = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { userId, role } = user!;
-    let where: any = { organizationId };
+    const where: any = { organizationId, deletedAt: null };
+    const studentFacingRoles = ['STUDENT', 'PARENT'];
 
     switch (role) {
       case 'STUDENT':
@@ -140,17 +236,18 @@ export const getAssignments = async (req: Request, res: Response) => {
       case 'INSTRUCTOR':
         where.module = { course: { instructorId: userId } };
         break;
-      case 'PARENT':
+      case 'PARENT': {
         const guardian = await prisma.guardian.findFirst({
           where: { parentUserId: userId, organizationId },
-          select: { studentId: true },
+          select: { studentUserId: true },
         });
         if (guardian) {
-          where.module = { course: { cohorts: { some: { enrollments: { some: { userId: guardian.studentId } } } } } };
+          where.module = { course: { cohorts: { some: { enrollments: { some: { userId: guardian.studentUserId } } } } } };
         } else {
           return res.json({ success: true, data: [] });
         }
         break;
+      }
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
@@ -159,12 +256,48 @@ export const getAssignments = async (req: Request, res: Response) => {
       default:
         return res.status(403).json({ success: false, message: 'Unauthorized role' });
     }
+    if (studentFacingRoles.includes(role)) where.status = 'PUBLISHED';
 
-    const assignments = await prisma.assignment.findMany({ where });
+    const assignments = await prisma.assignment.findMany({ where, include: assignmentAttachmentInclude });
     return res.json({ success: true, data: assignments });
   } catch (error: any) {
     console.error('[getAssignments Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to get assignments' });
+  }
+};
+
+export const getSubmissions = async (req: Request, res: Response) => {
+  try {
+    const { organizationId, user } = req;
+    const where: any = { organizationId };
+    if (user!.role === 'STUDENT') {
+      // A student's own history view needs every attempt, including drafts
+      // and superseded resubmissions — no isLatest/status filter here.
+      where.studentId = user!.userId;
+    } else if (user!.role === 'INSTRUCTOR') {
+      where.assignment = { module: { course: { instructorId: user!.userId } } };
+      where.isLatest = true;
+      where.status = 'SUBMITTED';
+    } else if (['ORG_ADMIN', 'SUPER_ADMIN', 'PRINCIPAL', 'STAFF'].includes(user!.role)) {
+      where.isLatest = true;
+      where.status = 'SUBMITTED';
+    } else {
+      return res.status(403).json({ success: false, message: 'Unauthorized role' });
+    }
+    const submissions = await prisma.submission.findMany({
+      where,
+      include: {
+        assignment: true,
+        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        grades: true,
+        attachments: { include: { fileAsset: { select: attachmentSelect } } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+    return res.json({ success: true, data: submissions });
+  } catch (error) {
+    console.error('[getSubmissions Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to get submissions' });
   }
 };
 
@@ -173,7 +306,7 @@ export const getQuizzes = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { userId, role } = user!;
-    let where: any = { organizationId };
+    const where: any = { organizationId };
 
     switch (role) {
       case 'STUDENT':
@@ -182,17 +315,18 @@ export const getQuizzes = async (req: Request, res: Response) => {
       case 'INSTRUCTOR':
         where.module = { course: { instructorId: userId } };
         break;
-      case 'PARENT':
+      case 'PARENT': {
         const guardian = await prisma.guardian.findFirst({
           where: { parentUserId: userId, organizationId },
-          select: { studentId: true },
+          select: { studentUserId: true },
         });
         if (guardian) {
-          where.module = { course: { cohorts: { some: { enrollments: { some: { userId: guardian.studentId } } } } } };
+          where.module = { course: { cohorts: { some: { enrollments: { some: { userId: guardian.studentUserId } } } } } };
         } else {
           return res.json({ success: true, data: [] });
         }
         break;
+      }
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
@@ -215,7 +349,10 @@ export const getAttendance = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { userId, role } = user!;
-    let where: any = { organizationId };
+    const { cohortId, studentId, from, to, status } = req.query as unknown as {
+      cohortId?: string; studentId?: string; from?: Date; to?: Date; status?: string;
+    };
+    const where: any = { organizationId };
 
     switch (role) {
       case 'STUDENT':
@@ -224,17 +361,20 @@ export const getAttendance = async (req: Request, res: Response) => {
       case 'INSTRUCTOR':
         where.cohort = { course: { instructorId: userId } };
         break;
-      case 'PARENT':
-        const guardian = await prisma.guardian.findFirst({
-          where: { parentUserId: userId, organizationId },
-          select: { studentId: true },
+      case 'PARENT': {
+        const guardians = await prisma.guardian.findMany({
+          where: { parentUserId: userId, organizationId, status: 'APPROVED' },
+          select: { studentUserId: true, permissions: true },
         });
-        if (guardian) {
-          where.studentId = guardian.studentId;
-        } else {
+        const allowedStudentIds = guardians
+          .filter((guardian) => guardian.permissions.includes('VIEW_ATTENDANCE'))
+          .map((guardian) => guardian.studentUserId);
+        if (allowedStudentIds.length === 0 || (studentId && !allowedStudentIds.includes(studentId))) {
           return res.json({ success: true, data: [] });
         }
+        where.studentId = studentId || { in: allowedStudentIds };
         break;
+      }
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
@@ -244,7 +384,23 @@ export const getAttendance = async (req: Request, res: Response) => {
         return res.status(403).json({ success: false, message: 'Unauthorized role' });
     }
 
-    const attendance = await prisma.attendance.findMany({ where });
+    if (cohortId) where.cohortId = cohortId;
+    if (studentId && role !== 'PARENT' && role !== 'STUDENT') where.studentId = studentId;
+    if (status) where.status = status;
+    if (from || to) {
+      where.date = {};
+      if (from) where.date.gte = from;
+      if (to) where.date.lte = to;
+    }
+
+    const attendance = await prisma.attendance.findMany({
+      where,
+      include: {
+        cohort: { select: { id: true, name: true, course: { select: { id: true, title: true } } } },
+        student: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { date: 'desc' },
+    });
     return res.json({ success: true, data: attendance });
   } catch (error: any) {
     console.error('[getAttendance Error]', error);
@@ -257,7 +413,7 @@ export const getGrades = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { userId, role } = user!;
-    let where: any = { organizationId };
+    const where: any = { organizationId };
 
     switch (role) {
       case 'STUDENT':
@@ -266,17 +422,18 @@ export const getGrades = async (req: Request, res: Response) => {
       case 'INSTRUCTOR':
         where.submission = { assignment: { module: { course: { instructorId: userId } } } };
         break;
-      case 'PARENT':
+      case 'PARENT': {
         const guardian = await prisma.guardian.findFirst({
           where: { parentUserId: userId, organizationId },
-          select: { studentId: true },
+          select: { studentUserId: true },
         });
         if (guardian) {
-          where.studentId = guardian.studentId;
+          where.studentId = guardian.studentUserId;
         } else {
           return res.json({ success: true, data: [] });
         }
         break;
+      }
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
@@ -299,15 +456,30 @@ export const getUsers = async (req: Request, res: Response) => {
   try {
     const { organizationId, user } = req;
     const { role } = user!;
-    let where: any = { organizationId };
+    const where: any = { organizationId };
 
     switch (role) {
       case 'ORG_ADMIN':
       case 'SUPER_ADMIN':
       case 'PRINCIPAL':
-      case 'STAFF':
-        const users = await prisma.user.findMany({ where });
+      case 'STAFF': {
+        const users = await prisma.user.findMany({
+          where,
+          select: {
+            id: true,
+            organizationId: true,
+            username: true,
+            email: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
         return res.json({ success: true, data: users });
+      }
       default:
         // Other roles should not be able to list all users
         return res.json({ success: true, data: [] });
@@ -318,33 +490,122 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
+export const getTeacherStudents = async (req: Request, res: Response) => {
+  try {
+    const organizationId = req.organizationId!;
+    const { role, userId } = req.user!;
+    const where: any = { organizationId, role: 'STUDENT' };
+
+    if (role === 'INSTRUCTOR') {
+      where.enrollments = {
+        some: {
+          cohort: {
+            course: { instructorId: userId },
+          },
+        },
+      };
+    } else if (!['ORG_ADMIN', 'SUPER_ADMIN', 'PRINCIPAL', 'STAFF'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized role' });
+    }
+
+    const students = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        enrollments: {
+          where: role === 'INSTRUCTOR'
+            ? { cohort: { course: { instructorId: userId } } }
+            : undefined,
+          select: {
+            cohort: {
+              select: {
+                id: true,
+                name: true,
+                course: { select: { id: true, title: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+
+    return res.json({ success: true, data: students });
+  } catch (error) {
+    console.error('[getTeacherStudents Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to get enrolled students' });
+  }
+};
+
+export const getAvailableStudents = async (req: Request, res: Response) => {
+  try {
+    const students = await prisma.user.findMany({
+      where: { organizationId: req.organizationId!, role: 'STUDENT' },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        enrollments: {
+          where: req.user!.role === 'INSTRUCTOR'
+            ? { cohort: { course: { instructorId: req.user!.userId } } }
+            : undefined,
+          select: {
+            id: true,
+            cohortId: true,
+            cohort: {
+              select: {
+                name: true,
+                course: { select: { id: true, title: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+    return res.json({ success: true, data: students });
+  } catch (error) {
+    console.error('[getAvailableStudents Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to get students' });
+  }
+};
+
 // 8. Student dashboard
 export const getStudentDashboard = async (req: Request, res: Response) => {
   try {
     const organizationId = req.organizationId!;
+    const studentId = req.user!.userId;
+    const enrolledCourseWhere = {
+      organizationId,
+      deletedAt: null,
+      cohorts: { some: { enrollments: { some: { userId: studentId } } } },
+    };
 
-    // 1. Stats: Fetch real data from the database
     const [coursesCount, assignmentsCount, examsCount] = await Promise.all([
-      prisma.course.count({ where: { organizationId } }),
-      prisma.assignment.count({ where: { organizationId } }),
-      prisma.quiz.count({ where: { organizationId } }),
+      prisma.course.count({ where: enrolledCourseWhere }),
+      prisma.assignment.count({
+        where: { organizationId, module: { course: enrolledCourseWhere } },
+      }),
+      prisma.quiz.count({
+        where: { organizationId, module: { course: enrolledCourseWhere } },
+      }),
     ]);
 
-    // 2. Course progress: real course titles, no completion-tracking model yet
-    // TODO: replace mocked progress once lesson-completion tracking exists
-    const courses = await prisma.course.findMany({
-      where: { organizationId },
-      take: 4,
-      orderBy: { createdAt: 'desc' },
-    });
-    const courseProgress = courses.map((course, index) => ({
-      label: course.title,
-      progress: Math.max(20, 90 - index * 15),
-    }));
+    // No lesson-completion model exists, so do not manufacture progress values.
+    const courseProgress: { label: string; progress: number }[] = [];
 
-    // 3. Upcoming assignments: real data, ordered by due date
     const upcomingAssignmentsRaw = await prisma.assignment.findMany({
-      where: { organizationId, dueDate: { gte: new Date() } },
+      where: {
+        organizationId,
+        dueDate: { gte: new Date() },
+        module: { course: enrolledCourseWhere },
+      },
       include: { module: { include: { course: true } } },
       orderBy: { dueDate: 'asc' },
       take: 5,
@@ -354,21 +615,19 @@ export const getStudentDashboard = async (req: Request, res: Response) => {
       subtitle: a.dueDate.toISOString(),
     }));
 
-    // 4. Today's classes: derived from active cohorts, no class-schedule model yet
-    // TODO: replace with real schedule data when a timetable model exists
-    const activeCohorts = await prisma.cohort.findMany({
-      where: { organizationId },
-      include: { course: true },
-      orderBy: { startDate: 'desc' },
-      take: 3,
+    const dayByIndex = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as const;
+    const todayClasses = await prisma.schedule.findMany({
+      where: {
+        organizationId,
+        dayOfWeek: dayByIndex[new Date().getDay()],
+        course: enrolledCourseWhere,
+      },
+      include: { course: { select: { id: true, title: true } } },
+      orderBy: { startTime: 'asc' },
     });
-    const todayClasses = activeCohorts.map(cohort => ({
-      title: cohort.course.title,
-    }));
 
-    // 5. Recent grades: real data
     const recentGradesRaw = await prisma.grade.findMany({
-      where: { organizationId },
+      where: { organizationId, studentId },
       include: { submission: { include: { assignment: true } } },
       orderBy: { gradedAt: 'desc' },
       take: 5,
@@ -379,28 +638,21 @@ export const getStudentDashboard = async (req: Request, res: Response) => {
       value: grade.score,
     }));
 
-    // 6. Notifications: real data
-    const notificationsRaw = await prisma.notification.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-    const notifications = notificationsRaw.map(n => ({
+    const notificationProjection = await getNotificationProjection(organizationId, studentId);
+    const notifications = notificationProjection.items.map(n => ({
       title: n.title,
       subtitle: n.body,
     }));
 
-    // 7. Engagement: derived from real attendance records
     const [presentCount, totalAttendance] = await Promise.all([
-      prisma.attendance.count({ where: { organizationId, status: 'PRESENT' } }),
-      prisma.attendance.count({ where: { organizationId } }),
+      prisma.attendance.count({ where: { organizationId, studentId, status: 'PRESENT' } }),
+      prisma.attendance.count({ where: { organizationId, studentId } }),
     ]);
     const engagementRate = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
     const engagement = { value: `${engagementRate}%` };
 
-    // 8. Activity feed: real audit log data
     const auditLogs = await prisma.auditLog.findMany({
-      where: { organizationId },
+      where: { organizationId, userId: studentId },
       orderBy: { createdAt: 'desc' },
       take: 5,
     });
@@ -410,15 +662,11 @@ export const getStudentDashboard = async (req: Request, res: Response) => {
       active: index === 0,
     }));
 
-    // 9. Study hours: no time-tracking model yet
-    // TODO: replace mocked study hours once a study-session model exists
     const dashboardData = {
       stats: {
         courses: coursesCount,
         assignments: assignmentsCount,
         exams: examsCount,
-        studyHours: 12,
-        studyHoursDelta: 2,
       },
       courseProgress,
       upcomingAssignments,
@@ -429,12 +677,13 @@ export const getStudentDashboard = async (req: Request, res: Response) => {
       activityFeed,
     };
 
-    return res.json(dashboardData);
+    return res.json({ success: true, data: dashboardData });
   } catch (error: any) {
     console.error('Error fetching student dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Оюутны хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
     });
   }
 };
@@ -447,12 +696,18 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // 1. Stats: real DB counts
-    const [studentsCount, instructorsCount, staffCount, coursesCount] = await Promise.all([
+    const [studentsCount, instructorsCount, staffCount, coursesCount, activeCohortsCount, presentCount, totalAttendanceCount, billingSummary, atRiskSummary] = await Promise.all([
       prisma.user.count({ where: { organizationId, role: 'STUDENT' } }),
       prisma.user.count({ where: { organizationId, role: 'INSTRUCTOR' } }),
       prisma.user.count({ where: { organizationId, role: { notIn: ['STUDENT', 'INSTRUCTOR'] } } }),
-      prisma.course.count({ where: { organizationId } }),
+      prisma.course.count({ where: { organizationId, deletedAt: null } }),
+      prisma.cohort.count({ where: { organizationId, status: 'ACTIVE' } }),
+      prisma.attendance.count({ where: { organizationId, status: 'PRESENT' } }),
+      prisma.attendance.count({ where: { organizationId } }),
+      getOrganizationBillingSummary(organizationId),
+      getOrganizationAtRiskSummary(organizationId),
     ]);
+    const averageAttendancePct = totalAttendanceCount > 0 ? Math.round((presentCount / totalAttendanceCount) * 100) : null;
 
     // 2. Recent Users: last 5 users
     const recentUsersRaw = await prisma.user.findMany({
@@ -478,6 +733,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const coursesWithRecentSubmission = await prisma.course.count({
       where: {
         organizationId,
+        deletedAt: null,
         modules: { some: { assignments: { some: { submissions: { some: { submittedAt: { gte: thirtyDaysAgo } } } } } } },
       },
     });
@@ -504,14 +760,10 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
 
     // 5. System status: real for this service/DB (the query above already succeeded);
     // real timeout-guarded health checks for the others, never a hardcoded "Online".
-    const [authOnline, billingOnline] = await Promise.all([
-      checkServiceHealth(process.env.AUTH_SERVICE_URL || 'http://localhost:8001'),
-      checkServiceHealth(process.env.BILLING_SERVICE_URL || 'http://localhost:8004'),
-    ]);
+    const authOnline = await checkServiceHealth(process.env.AUTH_SERVICE_URL || 'http://localhost:8001');
     const systemStatus = [
       { label: 'Academic Service', value: 'Online', status: 'OK' },
       { label: 'Auth Service', value: authOnline ? 'Online' : 'Тодорхойгүй', status: authOnline ? 'OK' : 'UNKNOWN' },
-      { label: 'Billing Service', value: billingOnline ? 'Online' : 'Тодорхойгүй', status: billingOnline ? 'OK' : 'UNKNOWN' },
       { label: 'Database (PostgreSQL)', value: 'Connected', status: 'OK' },
     ];
 
@@ -521,19 +773,32 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         instructors: instructorsCount,
         staff: staffCount,
         courses: coursesCount,
+        activeCohorts: activeCohortsCount,
+        averageAttendancePct,
+        revenue: billingSummary?.revenue ?? null,
+        receivable: billingSummary?.receivable ?? null,
+        billingCurrency: billingSummary?.currency ?? null,
       },
       activityOverview,
+      activityMetrics: [
+        { label: 'Шинэ хэрэглэгчид', value: newUsersLast30, max: Math.max(newUsersLast30, usersBefore30, 1) },
+        { label: 'Өмнөх 30 хоногийн хэрэглэгчид', value: usersBefore30, max: Math.max(newUsersLast30, usersBefore30, 1) },
+        { label: 'Идэвхтэй хичээлүүд', value: coursesWithRecentSubmission, max: Math.max(coursesCount, 1) },
+        { label: 'Нийт хичээл', value: coursesCount, max: Math.max(coursesCount, 1) },
+      ],
       recentUsers,
+      atRiskSummary,
       systemLogs,
       systemStatus,
     };
 
-    return res.json(dashboardData);
+    return res.json({ success: true, data: dashboardData });
   } catch (error: any) {
     console.error('Error fetching admin dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Админы хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
     });
   }
 };
@@ -545,7 +810,7 @@ export const getTeacherDashboard = async (req: Request, res: Response) => {
     const instructorId = req.user!.userId;
 
     const instructorCourses = await prisma.course.findMany({
-      where: { organizationId, instructorId },
+      where: { organizationId, instructorId, deletedAt: null },
       include: {
         modules: {
           include: {
@@ -609,20 +874,15 @@ export const getTeacherDashboard = async (req: Request, res: Response) => {
       score: `${g.score} оноо`,
     }));
 
-    // Upcoming classes: instructor's own active cohorts (title only)
-    // TODO: replace with real schedule data when a timetable model exists
-    const instructorCohorts = await prisma.cohort.findMany({
-      where: { organizationId, course: { instructorId } },
+    const upcomingClasses = await prisma.schedule.findMany({
+      where: { organizationId, teacherId: instructorId },
       include: { course: true },
-      orderBy: { startDate: 'desc' },
-      take: 3,
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      take: 5,
     });
-    const upcomingClasses = instructorCohorts.map(cohort => ({ title: cohort.course.title }));
 
-    // Activity feed: org-wide recent audit log (documented fallback — true per-instructor
-    // scoping isn't feasible without typed entity linkage on AuditLog).
     const auditLogs = await prisma.auditLog.findMany({
-      where: { organizationId },
+      where: { organizationId, userId: instructorId },
       orderBy: { createdAt: 'desc' },
       take: 5,
     });
@@ -632,24 +892,28 @@ export const getTeacherDashboard = async (req: Request, res: Response) => {
     }));
 
     return res.json({
-      stats: {
-        courses: instructorCourses.length,
-        students: studentIdSet.size,
-        averageGrade: scoreToLetter(averageGrade),
-        pendingReviews,
-        gradesCount: gradesForInstructor.length,
+      success: true,
+      data: {
+        stats: {
+          courses: instructorCourses.length,
+          students: studentIdSet.size,
+          averageGrade: scoreToLetter(averageGrade),
+          pendingReviews,
+          gradesCount: gradesForInstructor.length,
+        },
+        courseList,
+        reviewList,
+        upcomingClasses,
+        perfList,
+        activityFeed,
       },
-      courseList,
-      reviewList,
-      upcomingClasses,
-      perfList,
-      activityFeed,
     });
   } catch (error: any) {
     console.error('Error fetching teacher dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Багшийн хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
     });
   }
 };
@@ -661,29 +925,44 @@ export const getParentDashboard = async (req: Request, res: Response) => {
     const parentUserId = req.user!.userId;
     const now = new Date();
 
-    const guardianLink = await prisma.guardian.findFirst({
-      where: { organizationId, parentUserId },
+    const guardianLinks = await prisma.guardian.findMany({
+      where: { organizationId, parentUserId, status: 'APPROVED' },
       include: { studentUser: true },
+      orderBy: { createdAt: 'asc' },
     });
 
-    if (!guardianLink) {
+    if (guardianLinks.length === 0) {
       return res.json({
-        hasChild: false,
-        stats: [],
-        child: null,
-        assignmentProgress: [],
-        upcomingEvents: [],
-        teacherMessages: [],
-        attendanceBreakdown: [],
-        recentGrades: [],
-        schoolNotices: [],
-        academicProgress: { value: null },
-        activityFeed: [],
+        success: true,
+        data: {
+          hasChild: false,
+          stats: [],
+          child: null,
+          children: [],
+          assignmentProgress: [],
+          upcomingEvents: [],
+          teacherMessages: [],
+          attendanceBreakdown: [],
+          recentGrades: [],
+          schoolNotices: [],
+          courseContacts: [],
+          academicProgress: { value: null },
+          activityFeed: [],
+        },
       });
     }
 
+    const requestedChildId = typeof req.query.studentId === 'string' ? req.query.studentId : undefined;
+    const guardianLink = guardianLinks.find(g => g.studentUserId === requestedChildId) || guardianLinks[0];
+    const children = guardianLinks.map(g => ({
+      id: g.studentUser.id,
+      name: `${g.studentUser.lastName} ${g.studentUser.firstName}`.trim(),
+      studentId: g.studentUser.studentId,
+    }));
+
     const child = guardianLink.studentUser;
     const childId = child.id;
+    const permissions = guardianLink.permissions;
 
     const [presentCount, absentCount, lateCount, excusedCount, totalAttendance] = await Promise.all([
       prisma.attendance.count({ where: { organizationId, studentId: childId, status: 'PRESENT' } }),
@@ -715,6 +994,28 @@ export const getParentDashboard = async (req: Request, res: Response) => {
       });
     });
 
+    const enrolledCourses = new Map(
+      childEnrollments.map(e => [e.cohort.course.id, e.cohort.course]),
+    );
+    const instructorIds = [...new Set([...enrolledCourses.values()].map(c => c.instructorId))];
+    const instructors = instructorIds.length
+      ? await prisma.user.findMany({
+        where: { id: { in: instructorIds }, organizationId },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      })
+      : [];
+    const instructorById = new Map(instructors.map(i => [i.id, i]));
+    const courseContacts = [...enrolledCourses.values()].map(course => {
+      const instructor = instructorById.get(course.instructorId);
+      return {
+        courseId: course.id,
+        courseTitle: course.title,
+        courseCode: course.code,
+        instructorName: instructor ? `${instructor.lastName} ${instructor.firstName}`.trim() : null,
+        instructorEmail: instructor?.email || null,
+      };
+    });
+
     const childSubmissions = await prisma.submission.findMany({
       where: { organizationId, studentId: childId },
       include: { grades: true },
@@ -739,18 +1040,13 @@ export const getParentDashboard = async (req: Request, res: Response) => {
       .slice(0, 3)
       .map(a => ({ title: a.title, subtitle: new Date(a.dueDate).toLocaleDateString('mn-MN') }));
 
-    const unreadNotifications = await prisma.notification.count({
-      where: { organizationId, userId: parentUserId, isRead: false },
-    });
-
-    // Reuses the per-recipient Notification model as a messaging proxy — no
-    // dedicated parent-teacher messaging model exists.
-    const parentNotifications = await prisma.notification.findMany({
-      where: { organizationId, userId: parentUserId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-    const teacherMessages = parentNotifications.map(n => ({ subject: n.title, sender: 'Мэдэгдэл', body: n.body }));
+    const parentNotifications = await getNotificationProjection(organizationId, parentUserId);
+    const unreadNotifications = parentNotifications.unreadCount;
+    const teacherMessages = parentNotifications.items.map(n => ({
+      subject: n.title,
+      sender: 'Мэдэгдэл',
+      body: n.body,
+    }));
 
     const attendanceBreakdown = [
       { label: 'Ирсэн', value: attendancePct },
@@ -785,39 +1081,49 @@ export const getParentDashboard = async (req: Request, res: Response) => {
       active: index === 0,
     }));
 
+    const canViewGrades = permissions.includes('VIEW_GRADES');
+    const canViewAttendance = permissions.includes('VIEW_ATTENDANCE');
+
     return res.json({
-      hasChild: true,
-      stats: [
-        { title: 'Ирц', value: `${attendancePct}%`, delta: '' },
-        { title: 'Дундаж дүн', value: scoreToLetter(avgGrade), delta: '' },
-        { title: 'Дaалгавар', value: `${gradedCount}/${totalAssignmentsForHomework}`, delta: `${homeworkPct}%` },
-        { title: 'Мэдэгдэл', value: unreadNotifications, delta: unreadNotifications > 0 ? `Шинэ ${unreadNotifications}` : '' },
-      ],
-      child: {
-        name: `${child.lastName} ${child.firstName}`.trim(),
-        badge: 'Оюутан',
-        meta,
-        profileStat: {
-          label: 'Ирцийн хувь',
-          value: `${attendancePct}%`,
-          progress: attendancePct,
-          hint: `Энэ семестрт ${absentCount + excusedCount} удаа тасалсан`,
+      success: true,
+      data: {
+        hasChild: true,
+        children,
+        stats: [
+          { title: 'Ирц', value: canViewAttendance ? `${attendancePct}%` : '—', delta: '' },
+          { title: 'Дундаж дүн', value: canViewGrades ? scoreToLetter(avgGrade) : '—', delta: '' },
+          { title: 'Дaалгавар', value: `${gradedCount}/${totalAssignmentsForHomework}`, delta: `${homeworkPct}%` },
+          { title: 'Мэдэгдэл', value: unreadNotifications, delta: unreadNotifications > 0 ? `Шинэ ${unreadNotifications}` : '' },
+        ],
+        child: {
+          id: child.id,
+          name: `${child.lastName} ${child.firstName}`.trim(),
+          badge: 'Оюутан',
+          meta,
+          profileStat: {
+            label: 'Ирцийн хувь',
+            value: canViewAttendance ? `${attendancePct}%` : '—',
+            progress: canViewAttendance ? attendancePct : 0,
+            hint: canViewAttendance ? `Энэ семестрт ${absentCount + excusedCount} удаа тасалсан` : 'Ирцийн мэдээлэл харах эрхгүй',
+          },
         },
+        assignmentProgress,
+        upcomingEvents,
+        teacherMessages,
+        attendanceBreakdown: canViewAttendance ? attendanceBreakdown : [],
+        recentGrades: canViewGrades ? recentGrades : [],
+        schoolNotices,
+        courseContacts,
+        academicProgress: { value: canViewGrades ? scoreToLetter(avgGrade) : null },
+        activityFeed,
       },
-      assignmentProgress,
-      upcomingEvents,
-      teacherMessages,
-      attendanceBreakdown,
-      recentGrades,
-      schoolNotices,
-      academicProgress: { value: scoreToLetter(avgGrade) },
-      activityFeed,
     });
   } catch (error: any) {
     console.error('Error fetching parent dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Эцэг эхийн хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
     });
   }
 };
@@ -902,26 +1208,30 @@ export const getStaffDashboard = async (req: Request, res: Response) => {
     const recentActivities = auditLogs.map(log => `${log.action} • ${log.entity}`);
 
     return res.json({
-      stats: [
-        { label: 'Documents', value: documentsCount },
-        { label: 'Scholarships', value: scholarshipsCount },
-        { label: 'Announcements', value: announcementsCount },
-        { label: 'Reports', value: reportsCount },
-      ],
-      pendingDocuments,
-      scholarshipRequests,
-      announcements,
-      recentActivities,
-      quickStats: {
-        openApplications: openDocumentApplications + openScholarshipApplications,
-        todaysNotices: todaysAnnouncements,
+      success: true,
+      data: {
+        stats: [
+          { key: 'documents', label: 'Бичиг баримт', value: documentsCount },
+          { key: 'scholarships', label: 'Тэтгэлэг', value: scholarshipsCount },
+          { key: 'announcements', label: 'Зарлал', value: announcementsCount },
+          { key: 'reports', label: 'Тайлан', value: reportsCount },
+        ],
+        pendingDocuments,
+        scholarshipRequests,
+        announcements,
+        recentActivities,
+        quickStats: {
+          openApplications: openDocumentApplications + openScholarshipApplications,
+          todaysNotices: todaysAnnouncements,
+        },
       },
     });
   } catch (error: any) {
     console.error('Error fetching staff dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Ажилтны хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
     });
   }
 };
@@ -948,7 +1258,10 @@ export const getPrincipalDashboard = async (req: Request, res: Response) => {
       prisma.certificate.findMany({ where: { organizationId }, select: { studentId: true }, distinct: ['studentId'] }),
       prisma.attendance.count({ where: { organizationId, status: 'PRESENT' } }),
       prisma.attendance.count({ where: { organizationId } }),
-      prisma.course.findMany({ where: { organizationId }, select: { title: true, department: true } }),
+      prisma.course.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { title: true, department: true },
+      }),
       prisma.enrollment.findMany({ where: { organizationId, enrolledAt: { gte: sixMonthsAgoStart } }, select: { enrolledAt: true } }),
       prisma.attendance.findMany({ where: { organizationId, date: { gte: sixMonthsAgoStart } }, select: { date: true, status: true, studentId: true } }),
     ]);
@@ -1028,11 +1341,8 @@ export const getPrincipalDashboard = async (req: Request, res: Response) => {
       value: count > 0 ? scoreToLetter(total / count) : 'N/A',
     }));
 
-    const [authOnline, billingOnline] = await Promise.all([
-      checkServiceHealth(process.env.AUTH_SERVICE_URL || 'http://localhost:8001'),
-      checkServiceHealth(process.env.BILLING_SERVICE_URL || 'http://localhost:8004'),
-    ]);
-    const systemStatusValue = authOnline && billingOnline ? 'Хэвийн' : 'Анхаарах шаардлагатай';
+    const authOnline = await checkServiceHealth(process.env.AUTH_SERVICE_URL || 'http://localhost:8001');
+    const systemStatusValue = authOnline ? 'Хэвийн' : 'Анхаарах шаардлагатай';
 
     const auditLogs = await prisma.auditLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 });
     const activityFeed = auditLogs.map((log, index) => ({
@@ -1042,33 +1352,90 @@ export const getPrincipalDashboard = async (req: Request, res: Response) => {
     }));
 
     return res.json({
-      stats: [
-        { title: 'Элсэлт', value: totalEnrollment },
-        { title: 'Төгсөлт', value: `${graduationRatePct}%` },
-        { title: 'Ирц', value: `${attendancePct}%` },
-        { title: 'Тэнхим', value: departmentCount },
-      ],
-      enrollmentTrend: { value: enrollmentTrendValue },
-      // Note: the second slot originally read "Гарсан оюутан" (dropout count), a metric
-      // with no real backing model — replaced with a genuinely trackable metric instead
-      // of fabricating attrition data.
-      enrollmentDeltas: [
-        { label: 'Шинэ элсэлт', value: `${enrollmentDeltaPct >= 0 ? '+' : ''}${enrollmentDeltaPct}% энэ сард` },
-        { label: 'Идэвхтэй суралцагчид', value: `${activeStudentsThisMonth} сурагч энэ сард` },
-      ],
-      attendanceTrend: { value: `${latestAttendance.value}%` },
-      departmentPerformance,
-      graduationRate: { value: `${graduationRatePct}%` },
-      // No real reports/document-generation model exists — honestly empty.
-      managementReports: [] as { title: string; date: string }[],
-      systemStatus: { value: systemStatusValue },
-      activityFeed,
+      success: true,
+      data: {
+        stats: [
+          { title: 'Элсэлт', value: totalEnrollment },
+          { title: 'Төгсөлт', value: `${graduationRatePct}%` },
+          { title: 'Ирц', value: `${attendancePct}%` },
+          { title: 'Тэнхим', value: departmentCount },
+        ],
+        enrollmentTrend: { value: enrollmentTrendValue },
+        enrollmentSeries,
+        // Note: the second slot originally read "Гарсан оюутан" (dropout count), a metric
+        // with no real backing model — replaced with a genuinely trackable metric instead
+        // of fabricating attrition data.
+        enrollmentDeltas: [
+          { label: 'Шинэ элсэлт', value: `${enrollmentDeltaPct >= 0 ? '+' : ''}${enrollmentDeltaPct}% энэ сард` },
+          { label: 'Идэвхтэй суралцагчид', value: `${activeStudentsThisMonth} сурагч энэ сард` },
+        ],
+        attendanceTrend: { value: `${latestAttendance.value}%` },
+        attendanceSeries,
+        departmentPerformance,
+        graduationRate: { value: `${graduationRatePct}%` },
+        // No real reports/document-generation model exists — honestly empty.
+        managementReports: [] as { title: string; date: string }[],
+        systemStatus: { value: systemStatusValue },
+        activityFeed,
+      },
     });
   } catch (error: any) {
     console.error('Error fetching principal dashboard data:', error);
     return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
       message: 'Захирлын хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
-      error: error.message,
+    });
+  }
+};
+
+// 14. Finance dashboard
+export const getFinanceDashboard = async (req: Request, res: Response) => {
+  try {
+    const organizationId = req.organizationId!;
+
+    const [totalStudentsCount, totalCourses, auditLogs] = await Promise.all([
+      prisma.user.count({ where: { organizationId, role: 'STUDENT', deletedAt: null } }),
+      prisma.course.count({ where: { organizationId, deletedAt: null } }),
+      prisma.auditLog.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    // Per-student tuition invoicing has no backing data model yet (billing-service's
+    // Invoice/Payment models are scoped to the organization's own SaaS subscription,
+    // not individual students) — so invoice/transaction/trend figures are intentionally
+    // left empty rather than fabricated. Only real, queryable data is returned.
+    const activityFeed = auditLogs.map(log => ({
+      title: `${log.action} • ${log.entity}`,
+      time: new Date(log.createdAt).toLocaleString('mn-MN'),
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        stats: {
+          totalCollected: '0 ₮',
+          pendingAmount: '0 ₮',
+          overdueAmount: '0 ₮',
+          coverageRate: '0%',
+          totalStudents: totalStudentsCount,
+          totalCourses,
+        },
+        invoices: [],
+        recentTransactions: [],
+        monthlyTrends: [],
+        activityFeed,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching finance dashboard data:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'INTERNAL_ERROR',
+      message: 'Санхүүгийн хяналтын самбарын мэдээлэл авахад алдаа гарлаа.',
     });
   }
 };

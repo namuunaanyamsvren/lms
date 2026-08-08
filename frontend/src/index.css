@@ -1,19 +1,73 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover;
+  }
+  .course-builder label {
+    @apply text-sm font-medium text-slate-700 dark:text-slate-200;
+  }
+  .course-builder input, .course-builder textarea, .course-builder select {
+    @apply mt-1 block w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 font-normal;
+  }
+  .panel {
+    @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5;
+  }
+  .tag {
+    @apply inline-block bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1.5 text-sm;
+  }
+  .quiz-form input:not([type="checkbox"]), .quiz-form textarea, .quiz-form select {
+    @apply mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-900 px-3 py-2;
+  }
+  .quiz-form label {
+    @apply text-sm font-medium;
+  }
+  .quiz-form input[type="checkbox"] {
+    @apply mr-2;
+  }
+  table th, table td {
+    @apply text-left border-b border-slate-200 dark:border-slate-700 p-3;
+  }
+}
+
 :root {
-  --color-primary: #4f46e5;
+  --color-primary: #4F46E5;
+  --color-primary-rgb: 79 70 229;
+  --color-primary-hover: #4338CA;
+  --color-primary-hover-rgb: 67 56 202;
+  --color-secondary: #0EA5E9;
+  --color-secondary-rgb: 14 165 233;
   --color-background: #F8FAFC;
+  --color-background-rgb: 248 250 252;
   --color-card: #FFFFFF;
-  --color-text: #111827;
-  --color-border: #E2E8F0;
-  --color-muted: #64748B;
+  --color-card-rgb: 255 255 255;
   --color-surface: #F8FAFC;
+  --color-text: #0F172A;
+  --color-text-rgb: 15 23 42;
+  --color-border: #E2E8F0;
+  --color-border-rgb: 226 232 240;
+  --color-muted: #64748B;
+  --color-muted-rgb: 100 116 139;
+  --color-success: #16A34A;
+  --color-success-rgb: 22 163 74;
+  --color-warning: #F59E0B;
+  --color-warning-rgb: 245 158 11;
+  --color-error: #DC2626;
+  --color-error-rgb: 220 38 38;
+  --color-info: #0284C7;
+  --color-info-rgb: 2 132 199;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
   --radius-soft: 1rem;
   --shadow-soft: 0 20px 55px rgba(17, 24, 39, 0.08);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
   --space-xxs: 0.25rem;
   --space-xs: 0.5rem;
   --space-sm: 0.75rem;
@@ -24,6 +78,35 @@
   --space-2xl: 4rem;
 }
 
+.dark {
+  --color-primary: #6366F1;
+  --color-primary-rgb: 99 102 241;
+  --color-primary-hover: #818CF8;
+  --color-primary-hover-rgb: 129 140 248;
+  --color-secondary: #38BDF8;
+  --color-secondary-rgb: 56 189 248;
+  --color-background: #0F172A;
+  --color-background-rgb: 15 23 42;
+  --color-card: #1E293B;
+  --color-card-rgb: 30 41 59;
+  --color-surface: #1E293B;
+  --color-text: #F8FAFC;
+  --color-text-rgb: 248 250 252;
+  --color-border: #334155;
+  --color-border-rgb: 51 65 85;
+  --color-muted: #94A3B8;
+  --color-muted-rgb: 148 163 184;
+  --color-success: #22C55E;
+  --color-success-rgb: 34 197 94;
+  --color-warning: #FBBF24;
+  --color-warning-rgb: 251 191 36;
+  --color-error: #EF4444;
+  --color-error-rgb: 239 68 68;
+  --color-info: #38BDF8;
+  --color-info-rgb: 56 189 248;
+  --shadow-soft: 0 20px 55px rgba(0, 0, 0, 0.35);
+}
+
 *,
 *::before,
 *::after {
@@ -31,7 +114,7 @@
 }
 
 html {
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'DM Sans', 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   scroll-behavior: smooth;
 }
@@ -59,9 +142,10 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: 'Sora', 'Space Grotesk', 'DM Sans', sans-serif;
   color: var(--color-text);
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 p,
@@ -74,6 +158,11 @@ label {
   color: var(--color-text);
 }
 
+:focus-visible {
+  outline: 3px solid rgb(var(--color-primary-rgb) / 0.5);
+  outline-offset: 2px;
+}
+
 button,
 input,
 textarea,
@@ -81,8 +170,52 @@ select {
   font: inherit;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  nav,
+  aside,
+  header,
+  .no-print,
+  button {
+    display: none !important;
+  }
+
+  main,
+  section,
+  article,
+  .panel,
+  .card-soft {
+    box-shadow: none !important;
+    border-color: #999 !important;
+    break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+  }
+}
+
 ::selection {
-  background-color: rgba(37, 99, 235, 0.2);
+  background-color: rgb(var(--color-primary-rgb) / 0.22);
 }
 
 @layer utilities {
@@ -108,7 +241,7 @@ select {
     border: 1px solid var(--color-border);
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-soft bg-primary px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-slate-700;
+    @apply inline-flex items-center justify-center rounded-soft bg-primary px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-primary-hover;
   }
   .input-soft {
     @apply w-full rounded-soft border border-base bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
@@ -159,4 +292,3 @@ select {
     animation: float-delayed 5s ease-in-out infinite;
   }
 }
-

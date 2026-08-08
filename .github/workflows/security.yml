@@ -1,0 +1,160 @@
+name: Security and supply chain
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: '17 2 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  test-audit-license:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: test
+          RABBITMQ_DEFAULT_PASS: test
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://test:test@localhost:5672
+      ACCESS_TOKEN_SECRET: test-access-secret-with-at-least-forty-three-characters
+      REFRESH_TOKEN_SECRET: test-refresh-secret-with-at-least-forty-three-characters
+      SERVICE_TOKEN_SECRET: test-service-secret-with-at-least-forty-three-characters
+      CSRF_SECRET: test-csrf-secret-with-at-least-forty-three-characters
+      PHONE_OTP_HASH_SECRET: test-phone-secret-with-at-least-forty-three-characters
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Generate clients and deploy test schemas
+        run: |
+          npm run prisma:generate --prefix backend
+          npm run prisma:deploy --prefix backend
+      - name: Migration drift check
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d lms_test -c "CREATE DATABASE lms_migration_shadow;"
+          npm run prisma:check-drift --prefix backend
+      - name: Build backend and frontend
+        run: |
+          npm run build --prefix backend
+          npm run build --prefix frontend
+      - name: OpenAPI contract validation
+        run: |
+          npm run openapi:export --prefix backend
+          npx --yes @redocly/cli@1 lint --config=backend/.redocly.yaml
+      - name: Test
+        run: |
+          npm test --prefix backend
+          npm test --prefix frontend
+      - name: Dependency vulnerability gate
+        run: |
+          # Gate production dependencies only: devDependencies (build/test
+          # tooling such as vitest/vite) never ship in the runtime image
+          # (see each service's Dockerfile `npm prune --omit=dev`) and are
+          # covered by Dependabot instead of blocking the release gate.
+          (cd backend && npx --yes better-npm-audit@3 audit --level high --production)
+          # GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF bypass) has no fixed
+          # release yet as of 2026-08-03 — see things-to-do.md § 1.7. Re-check
+          # `npm audit --prefix frontend` after every react-router bump and
+          # drop this exclusion the moment a patched version exists.
+          (cd frontend && npx --yes better-npm-audit@3 audit --level high --production --exclude GHSA-qwww-vcr4-c8h2)
+      - name: Prohibited license gate
+        run: |
+          npx --yes license-checker-rseidelsohn@4.4.2 --start backend --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0"
+          npx --yes license-checker-rseidelsohn@4.4.2 --start frontend --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0"
+      - name: Generate software bill of materials
+        run: |
+          npx --yes @cyclonedx/cyclonedx-npm@1 --output-file backend/sbom.cdx.json backend/package.json
+          npx --yes @cyclonedx/cyclonedx-npm@1 --output-file frontend/sbom.cdx.json frontend/package.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            backend/sbom.cdx.json
+            frontend/sbom.cdx.json
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm run prisma:generate --prefix backend
+          npm run build --prefix backend
+          npm run build --prefix frontend
+      - uses: github/codeql-action/analyze@v4

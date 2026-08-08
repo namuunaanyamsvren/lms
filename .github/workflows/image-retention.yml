@@ -1,0 +1,36 @@
+name: Container image retention
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '45 3 * * 1'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - auth-service
+          - organization-service
+          - academic-service
+          - billing-service
+          - notification-service
+    steps:
+      - name: Keep the most recent images, always preserve latest/production
+        uses: snok/container-retention-policy@v3
+        with:
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: lms-${{ matrix.service }}
+          # latest/production tags never match this filter, so they're never
+          # deletion candidates regardless of age or count.
+          image-tags: 'sha-*'
+          tag-selection: tagged
+          cut-off: 30d
+          keep-n-most-recent: 20

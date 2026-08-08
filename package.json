@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "scripts": {
+    "backend:build": "npm run build --prefix backend",
+    "backend:test": "npm run test --prefix backend",
+    "backend:openapi": "npm run openapi:validate --prefix backend",
+    "frontend:build": "npm run build --prefix frontend",
+    "frontend:test": "npm run test --prefix frontend",
+    "smoke:db": "npm run test:smoke:db --prefix backend",
+    "verify:deploy": "node scripts/validate-deploy-ready.mjs"
+  },
+  "dependencies": {
+    "googleapis": "^173.0.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
+  }
+}

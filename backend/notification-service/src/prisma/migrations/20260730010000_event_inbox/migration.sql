@@ -1,0 +1,2 @@
+CREATE TABLE "EventInbox" ("id" TEXT NOT NULL,"eventId" TEXT NOT NULL,"consumer" TEXT NOT NULL,"eventType" TEXT NOT NULL,"status" TEXT NOT NULL DEFAULT 'PROCESSING',"error" TEXT,"receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"processedAt" TIMESTAMP(3),CONSTRAINT "EventInbox_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "EventInbox_eventId_consumer_key" ON "EventInbox"("eventId","consumer"); CREATE INDEX "EventInbox_status_receivedAt_idx" ON "EventInbox"("status","receivedAt");

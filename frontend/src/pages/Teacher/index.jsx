@@ -4,12 +4,12 @@ import PageHeader from '../../components/ui/PageHeader';
 import {
   TeachStat,
   CourseCard,
-  UpcomingClassItem,
   AssignmentReviewItem,
   PerfRow,
 } from './TeacherWidgets';
 import { getTeacherDashboardData } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import CalendarWithNotes from '../../components/dashboard/CalendarWithNotes';
 
 export default function Teacher() {
   const { user } = useAuth();
@@ -59,11 +59,11 @@ export default function Teacher() {
     <div className="space-y-6">
       <PageHeader
         title={`Багшийн самбар (${teacherName})`}
-        subtitle="Таны зааж буй хичээл болон оюутнуудын тойм (PostgreSQL)."
+        subtitle="Таны зааж буй хичээл болон сурагчдын тойм."
         right={
           <>
             <div className="text-sm text-slate-500">Өнөөдөр</div>
-            <div className="bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl text-sm font-medium">
+            <div className="bg-white border border-slate-100 px-3 py-2 rounded-xl text-sm font-medium">
               {new Date().toLocaleDateString('mn-MN')}
             </div>
           </>
@@ -78,7 +78,7 @@ export default function Teacher() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Миний зааж буй хичээлүүд (DB)">
+          <Card title="Миний зааж буй хичээлүүд">
             {dashboardData.courseList.length === 0 ? (
               <p className="text-sm text-slate-500">Танд одоогоор хичээл оноогоогүй байна.</p>
             ) : (
@@ -90,7 +90,7 @@ export default function Teacher() {
             )}
           </Card>
 
-          <Card title="Шалгах даалгаврууд (DB)">
+          <Card title="Шалгах даалгаврууд">
             {dashboardData.reviewList.length === 0 ? (
               <p className="text-sm text-slate-500">Шалгах даалгавар одоогоор алга байна.</p>
             ) : (
@@ -104,19 +104,9 @@ export default function Teacher() {
         </div>
 
         <div className="space-y-6">
-          <Card title="Идэвхтэй ангиуд">
-            {dashboardData.upcomingClasses.length === 0 ? (
-              <p className="text-sm text-slate-500">Идэвхтэй анги одоогоор алга байна.</p>
-            ) : (
-              <div className="space-y-2">
-                {dashboardData.upcomingClasses.map((c, i) => (
-                  <UpcomingClassItem key={i} title={c.title} time="Хуваарь тодорхойгүй" />
-                ))}
-              </div>
-            )}
-          </Card>
+          <CalendarWithNotes />
 
-          <Card title="Оюутнуудын гүйцэтгэл (DB)">
+          <Card title="Сурагчдын гүйцэтгэл">
             {dashboardData.perfList.length === 0 ? (
               <p className="text-sm text-slate-500">Дүнгийн мэдээлэл одоогоор алга байна.</p>
             ) : (

@@ -5,6 +5,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-billing"
 }
 
 enum PaymentStatus {
@@ -25,7 +26,8 @@ model Subscription {
   id             String      @id @default(uuid())
   organizationId String      @unique
   plan           PlanType    @default(FREE)
-  amount         Float
+  amount         Decimal     @db.Decimal(19, 4)
+  currency       String      @default("MNT") @db.VarChar(3)
   billingCycle   String      @default("monthly")
   isActive       Boolean     @default(true)
   nextBillingAt  DateTime
@@ -41,12 +43,73 @@ model Invoice {
   organizationId String
   subscriptionId String
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  amount         Float
+  studentId      String?
+  cohortId       String?
+  enrollmentId   String?
+  description    String?
+  amount         Decimal       @db.Decimal(19, 4)
+  currency       String        @default("MNT") @db.VarChar(3)
   status         PaymentStatus @default(PENDING)
+  dueDate        DateTime?
+  installmentNumber Int?
+  installmentTotal  Int?
+  reminderSentAt DateTime?
+  accessRestricted Boolean     @default(false)
   pdfR2Url       String?
   paidAt         DateTime?
   createdAt      DateTime      @default(now())
+  payments       Payment[]
 
   @@index([organizationId])
   @@index([subscriptionId])
+  @@index([organizationId, studentId])
+  @@index([organizationId, enrollmentId])
+  @@index([organizationId, status, dueDate])
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  organizationId String
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amount         Decimal       @db.Decimal(19, 4)
+  currency       String        @default("MNT") @db.VarChar(3)
+  method         String
+  transactionId  String
+  qpayInvoiceUrl String?
+  providerPayload Json?
+  status         PaymentStatus @default(COMPLETED)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, transactionId])
+  @@index([organizationId, createdAt])
+  @@index([invoiceId])
+}
+
+model EventInbox {
+  id String @id @default(uuid())
+  eventId String
+  consumer String
+  eventType String
+  status String @default("PROCESSING")
+  error String?
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+  @@unique([eventId, consumer])
+  @@index([status, receivedAt])
+}
+
+model BillingOutboxEvent {
+  id String @id @default(uuid())
+  eventType String
+  organizationId String
+  payload Json
+  traceId String?
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
+  attemptCount Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastError String?
+  @@index([publishedAt, nextAttemptAt])
 }

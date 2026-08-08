@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function TeachStat({ title, value, change }) {
   return (
@@ -16,7 +15,7 @@ export function CourseCard({ title, students, progress }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="font-medium text-slate-800">{title}</div>
-          <div className="text-xs text-slate-500">{students} students</div>
+          <div className="text-xs text-slate-500">{students} сурагч</div>
         </div>
         <div className="text-sm font-semibold">{progress}%</div>
       </div>
@@ -31,7 +30,7 @@ export function UpcomingClassItem({ title, time }) {
         <div className="text-sm font-medium">{title}</div>
         <div className="text-xs text-slate-500">{time}</div>
       </div>
-      <button className="text-indigo-600 text-sm">Start</button>
+      <button className="text-sm text-indigo-600">Эхлэх</button>
     </div>
   );
 }
@@ -40,7 +39,7 @@ export function AssignmentReviewItem({ title, pending }) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="text-sm">{title}</div>
-      <div className="text-sm text-slate-500">{pending} pending</div>
+      <div className="text-sm text-slate-500">{pending} шалгах</div>
     </div>
   );
 }

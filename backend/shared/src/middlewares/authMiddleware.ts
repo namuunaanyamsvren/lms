@@ -16,7 +16,11 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
       userId: payload.userId,
       organizationId: payload.organizationId,
       role: payload.role,
-      email: payload.email,
+      sessionId: payload.sessionId,
+      emailVerified: payload.emailVerified,
+      emailVerificationRequired: payload.emailVerificationRequired,
+      phoneVerified: payload.phoneVerified,
+      phoneVerificationRequired: payload.phoneVerificationRequired,
     };
 
     next();

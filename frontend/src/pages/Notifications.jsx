@@ -1,19 +1,31 @@
-import { useState } from 'react';
-import { Bell, CheckCheck, Trash2, Search, Filter } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck, Trash2, Search, Filter, ArrowRight } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
 import { formatDate } from '../utils/formatDate';
+import { useAuth } from '../context/AuthContext';
+import { resolveNotificationActionUrl } from '../utils/notificationActionUrl';
+import {
+  clearNotifications,
+  deleteNotification,
+  fetchNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from '../services/api';
 
 export default function Notifications() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'System Update', description: 'New features have been added to the platform.', createdAt: new Date(Date.now() - 10 * 60 * 1000), read: false, type: 'info' },
-    { id: 2, title: 'New Assignment', description: 'You have a new assignment due next week.', createdAt: new Date(Date.now() - 60 * 60 * 1000), read: false, type: 'warning' },
-    { id: 3, title: 'School Announcement', description: 'Important announcement about the upcoming semester.', createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), read: true, type: 'info' },
-    { id: 4, title: 'Grade Posted', description: 'Your grade for Math 101 has been posted.', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), read: true, type: 'success' },
-    { id: 5, title: 'Meeting Reminder', description: 'Don\'t forget about your advisor meeting tomorrow.', createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000), read: true, type: 'warning' },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    fetchNotifications(100).then(setNotifications).catch(error => {
+      console.error('Failed to load notifications:', error);
+    });
+  }, []);
 
   const filteredNotifications = notifications.filter(notification => {
     const matchesFilter = filter === 'all' || 
@@ -26,22 +38,32 @@ export default function Notifications() {
     return matchesFilter && matchesSearch;
   });
 
-  const handleMarkAsRead = (id) => {
+  const handleMarkAsRead = async (id) => {
+    await markNotificationAsRead(id);
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, read: true } : n
     ));
   };
 
-  const handleMarkAllAsRead = () => {
+  const handleMarkAllAsRead = async () => {
+    await markAllNotificationsAsRead();
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
+    await clearNotifications();
     setNotifications([]);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    await deleteNotification(id);
     setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleAction = async (notification) => {
+    if (!notification.read) await handleMarkAsRead(notification.id);
+    const actionUrl = resolveNotificationActionUrl(notification, user?.role);
+    if (actionUrl) navigate(actionUrl);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -49,8 +71,8 @@ export default function Notifications() {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Notifications" 
-        subtitle={`You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`}
+        title="Мэдэгдэл"
+        subtitle={`${unreadCount} уншаагүй мэдэгдэл байна`}
         right={
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
@@ -59,7 +81,7 @@ export default function Notifications() {
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
               >
                 <CheckCheck size={16} />
-                Mark all as read
+                Бүгдийг уншсанаар тэмдэглэх
               </button>
             )}
             {notifications.length > 0 && (
@@ -68,7 +90,7 @@ export default function Notifications() {
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
               >
                 <Trash2 size={16} />
-                Clear all
+                Бүгдийг цэвэрлэх
               </button>
             )}
           </div>
@@ -90,7 +112,7 @@ export default function Notifications() {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {({ all: 'Бүгд', unread: 'Уншаагүй', read: 'Уншсан' })[f]}
               </button>
             ))}
           </div>
@@ -100,7 +122,7 @@ export default function Notifications() {
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search notifications..."
+            placeholder="Мэдэгдэл хайх..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -138,13 +160,21 @@ export default function Notifications() {
                   <p className="text-xs text-slate-400 mt-2">
                     {formatDate(notification.createdAt)}
                   </p>
+                  {resolveNotificationActionUrl(notification, user?.role) && (
+                    <button
+                      onClick={() => handleAction(notification)}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Харах <ArrowRight size={12} />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {!notification.read && (
                     <button
                       onClick={() => handleMarkAsRead(notification.id)}
                       className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                      title="Mark as read"
+                      title="Уншсанаар тэмдэглэх"
                     >
                       <CheckCheck size={16} />
                     </button>
@@ -152,7 +182,7 @@ export default function Notifications() {
                   <button
                     onClick={() => handleDelete(notification.id)}
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    title="Delete"
+                    title="Устгах"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -163,8 +193,8 @@ export default function Notifications() {
         </div>
       ) : (
         <EmptyState
-          title="No notifications"
-          description={searchQuery ? 'No notifications match your search.' : 'You\'re all caught up!'}
+          title="Мэдэгдэл алга"
+          description={searchQuery ? 'Хайлтад тохирох мэдэгдэл олдсонгүй.' : 'Бүх мэдэгдлээ уншсан байна.'}
           icon={<Bell size={48} className="text-slate-300" />}
         />
       )}

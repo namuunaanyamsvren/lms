@@ -39,7 +39,7 @@ export default function HeroSection() {
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
                 <Link
                   to="/register"
-                  className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 hover:scale-105 active:scale-95"
+                  className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-7 py-3.5 text-sm font-semibold text-primary shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 hover:scale-105 active:scale-95"
                 >
                   Эхлэх
                 </Link>
@@ -54,25 +54,25 @@ export default function HeroSection() {
 
             <div className="mt-12 grid gap-4 sm:grid-cols-3">
               <FadeContent distance={30} delay={0.65} blur={true}>
-                <div className="rounded-[1.75rem] bg-slate-950 p-5 text-white shadow-soft transition-transform hover:-translate-y-1">
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Хэрэглэж буй сургууль</p>
-                  <p className="mt-3 text-3xl font-semibold text-white">
-                    <CountUp from={0} to={120} suffix="+" duration={2} className="text-white" />
+                <div className="rounded-[1.75rem] bg-indigo-50 p-5 text-slate-900 border border-indigo-100 shadow-soft transition-transform hover:-translate-y-1">
+                  <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Хэрэглэж буй сургууль</p>
+                  <p className="mt-3 text-3xl font-semibold text-primary">
+                    <CountUp from={0} to={120} suffix="+" duration={2} className="text-primary" />
                   </p>
                 </div>
               </FadeContent>
               <FadeContent distance={30} delay={0.75} blur={true}>
-                <div className="rounded-[1.75rem] bg-slate-950 p-5 text-white shadow-soft transition-transform hover:-translate-y-1">
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Оюутны итгэлцэл</p>
-                  <p className="mt-3 text-3xl font-semibold text-white">
-                    <CountUp from={0} to={18} suffix="K+" duration={2} className="text-white" />
+                <div className="rounded-[1.75rem] bg-indigo-50 p-5 text-slate-900 border border-indigo-100 shadow-soft transition-transform hover:-translate-y-1">
+                  <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Оюутны итгэлцэл</p>
+                  <p className="mt-3 text-3xl font-semibold text-primary">
+                    <CountUp from={0} to={18} suffix="K+" duration={2} className="text-primary" />
                   </p>
                 </div>
               </FadeContent>
               <FadeContent distance={30} delay={0.85} blur={true}>
-                <div className="rounded-[1.75rem] bg-slate-950 p-5 text-white shadow-soft transition-transform hover:-translate-y-1">
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Шуурхай мэдээлэл</p>
-                  <p className="mt-3 text-3xl font-semibold text-white">24/7</p>
+                <div className="rounded-[1.75rem] bg-indigo-50 p-5 text-slate-900 border border-indigo-100 shadow-soft transition-transform hover:-translate-y-1">
+                  <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Шуурхай мэдээлэл</p>
+                  <p className="mt-3 text-3xl font-semibold text-primary">24/7</p>
                 </div>
               </FadeContent>
             </div>
@@ -80,49 +80,49 @@ export default function HeroSection() {
 
           <FadeContent distance={40} duration={0.8} delay={0.3} blur={true} className="relative perspective-1000">
             <div className="rounded-[2.5rem] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-indigo-50/30 p-6 shadow-soft tilt-3d preserve-3d">
-              <div className="mb-6 flex items-center justify-between rounded-3xl bg-slate-950 px-5 py-4 text-white translate-z-10">
+              <div className="mb-6 flex items-center justify-between rounded-3xl bg-indigo-50 px-5 py-4 text-slate-900 border border-indigo-100 translate-z-10">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Хянах самбар</p>
-                  <h2 className="mt-2 text-xl font-semibold text-white">Сургуулийн гүйцэтгэл</h2>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Хянах самбар</p>
+                  <h2 className="mt-2 text-xl font-semibold text-slate-950">Сургуулийн гүйцэтгэл</h2>
                 </div>
-                <div className="rounded-2xl bg-indigo-500 px-3 py-2 text-sm font-semibold text-white animate-pulse">Шууд</div>
+                <div className="rounded-2xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white animate-pulse">Шууд</div>
               </div>
 
-              <div className="space-y-4 rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-900/10 translate-z-20 preserve-3d">
-                <div className="flex items-center justify-between text-sm translate-z-10 text-white">
-                  <span className="text-white">Идэвх оролцоо</span>
-                  <span className="font-semibold text-white">
-                    <CountUp from={0} to={92} suffix="%" duration={2.5} className="text-white" />
+              <div className="space-y-4 rounded-[2rem] bg-white p-6 text-slate-900 border border-indigo-100 shadow-2xl shadow-slate-900/10 translate-z-20 preserve-3d">
+                <div className="flex items-center justify-between text-sm translate-z-10 text-slate-700">
+                  <span className="text-primary">Идэвх оролцоо</span>
+                  <span className="font-semibold text-primary">
+                    <CountUp from={0} to={92} suffix="%" duration={2.5} className="text-primary" />
                   </span>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-800 translate-z-10">
+                <div className="h-3 overflow-hidden rounded-full bg-indigo-100 translate-z-10">
                   <div className="h-3 w-4/5 rounded-full bg-indigo-500 transition-all duration-1000" />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 translate-z-10">
-                  <div className="rounded-3xl bg-slate-900 p-4">
-                    <p className="text-sm text-slate-300">Идэвхтэй ангиуд</p>
-                    <p className="mt-3 text-2xl font-semibold text-white">
-                      <CountUp from={0} to={248} duration={2} className="text-white" />
+                  <div className="rounded-3xl bg-indigo-50 p-4 border border-indigo-100">
+                    <p className="text-sm text-slate-600">Идэвхтэй ангиуд</p>
+                    <p className="mt-3 text-2xl font-semibold text-primary">
+                      <CountUp from={0} to={248} duration={2} className="text-primary" />
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-slate-900 p-4">
-                    <p className="text-sm text-slate-300">Хүлээгдэж буй даалгавар</p>
-                    <p className="mt-3 text-2xl font-semibold text-white">
-                      <CountUp from={0} to={56} duration={2} className="text-white" />
+                  <div className="rounded-3xl bg-indigo-50 p-4 border border-indigo-100">
+                    <p className="text-sm text-slate-600">Хүлээгдэж буй даалгавар</p>
+                    <p className="mt-3 text-2xl font-semibold text-primary">
+                      <CountUp from={0} to={56} duration={2} className="text-primary" />
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-5 translate-z-10 preserve-3d">
-                <div className="relative h-64 overflow-hidden rounded-[1.75rem] bg-slate-950 p-6 text-white shadow-slate-900/10 preserve-3d">
+                <div className="relative h-64 overflow-hidden rounded-[1.75rem] bg-white p-6 text-slate-900 border border-indigo-100 shadow-slate-900/10 preserve-3d">
                   {/* Decorative glowing circles behind */}
                   <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-indigo-500/20 blur-2xl animate-pulse" />
                   <div className="absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-cyan-500/20 blur-2xl animate-pulse" />
 
-                  <div className="flex items-center justify-between text-sm text-slate-300 translate-z-10">
-                    <span className="text-white">Үр дүнгийн шинжилгээ</span>
-                    <span className="rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300">
+                  <div className="flex items-center justify-between text-sm text-slate-600 translate-z-10">
+                    <span className="text-slate-700">Үр дүнгийн шинжилгээ</span>
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
                       AI Зөвлөмж
                     </span>
                   </div>
@@ -130,21 +130,21 @@ export default function HeroSection() {
                   {/* Floating 3D Cards */}
                   <div className="relative mt-8 h-32 flex items-center justify-center">
                     {/* Behind Card */}
-                    <div className="absolute left-2 w-44 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-2xl animate-float pointer-events-none">
-                      <p className="text-[11px] text-slate-300">Идэвхтэй сурагчид</p>
-                      <p className="mt-1 text-lg font-bold text-white">
-                        <CountUp from={0} to={1840} separator="," duration={2.5} className="text-white" />
+                    <div className="absolute left-2 w-44 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 backdrop-blur-md shadow-2xl animate-float pointer-events-none">
+                      <p className="text-[11px] text-slate-600">Идэвхтэй сурагчид</p>
+                      <p className="mt-1 text-lg font-bold text-slate-950">
+                        <CountUp from={0} to={1840} separator="," duration={2.5} className="text-primary" />
                       </p>
-                      <div className="mt-2 h-1 w-full rounded-full bg-slate-800">
+                      <div className="mt-2 h-1 w-full rounded-full bg-indigo-100">
                         <div className="h-1 w-3/4 rounded-full bg-indigo-500" />
                       </div>
                     </div>
 
                     {/* Front Card */}
-                    <div className="absolute right-2 w-44 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-lg shadow-2xl animate-float-delayed pointer-events-none">
-                      <p className="text-[11px] text-slate-300">Амжилтын хувь</p>
-                      <p className="mt-1 text-xl font-extrabold text-white">
-                        +<CountUp from={0} to={14.2} decimals={1} suffix="%" duration={2.5} className="text-white" />
+                    <div className="absolute right-2 w-44 rounded-2xl border border-sky-100 bg-sky-50 p-4 backdrop-blur-lg shadow-2xl animate-float-delayed pointer-events-none">
+                      <p className="text-[11px] text-slate-600">Амжилтын хувь</p>
+                      <p className="mt-1 text-xl font-extrabold text-slate-950">
+                        +<CountUp from={0} to={14.2} decimals={1} suffix="%" duration={2.5} className="text-primary" />
                       </p>
                       <p className="text-[10px] text-emerald-400">▲ Маш сайн</p>
                     </div>

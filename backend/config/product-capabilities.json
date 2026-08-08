@@ -1,0 +1,126 @@
+{
+  "version": "2026.08",
+  "approvalDefault": "teacher_or_admin_required",
+  "capabilities": [
+    {
+      "key": "messaging",
+      "label": "In-app messaging",
+      "roles": ["INSTRUCTOR", "STUDENT", "PARENT", "STAFF", "ORG_ADMIN"],
+      "status": "contracted",
+      "guards": ["tenant_scoped_threads", "moderation_audit", "guardian_visibility_policy"]
+    },
+    {
+      "key": "discussionForum",
+      "label": "Discussion forum",
+      "roles": ["INSTRUCTOR", "STUDENT", "PARENT"],
+      "status": "contracted",
+      "guards": ["course_membership_required", "content_moderation", "report_abuse"]
+    },
+    {
+      "key": "liveClass",
+      "label": "Live class/video conference integration",
+      "roles": ["INSTRUCTOR", "STUDENT"],
+      "status": "integration_ready",
+      "providers": ["Zoom", "Google Meet", "Microsoft Teams"],
+      "guards": ["provider_webhook_signature", "recording_consent", "attendance_sync"]
+    },
+    {
+      "key": "calendarExport",
+      "label": "Calendar export iCal/Google Calendar",
+      "roles": ["INSTRUCTOR", "STUDENT", "PARENT"],
+      "status": "contracted",
+      "formats": ["ics", "google_calendar_deep_link"]
+    },
+    {
+      "key": "globalSearch",
+      "label": "Search across course/lesson/assignment",
+      "roles": ["INSTRUCTOR", "STUDENT", "PARENT", "STAFF", "ORG_ADMIN"],
+      "status": "partial_backend",
+      "guards": ["role_scoped_index", "tenant_isolation"]
+    },
+    {
+      "key": "learningAnalytics",
+      "label": "Learning analytics/risk alerts",
+      "roles": ["INSTRUCTOR", "PARENT", "PRINCIPAL", "ORG_ADMIN"],
+      "status": "contracted",
+      "guards": ["explainable_risk_reason", "no_sole_automated_decision", "parent_minor_policy"]
+    },
+    {
+      "key": "recommendations",
+      "label": "Personalized recommendation",
+      "roles": ["STUDENT", "INSTRUCTOR"],
+      "status": "contracted",
+      "guards": ["teacher_override", "privacy_minimization", "opt_out"]
+    },
+    {
+      "key": "gamification",
+      "label": "Gamification/badge/leaderboard",
+      "roles": ["STUDENT", "INSTRUCTOR"],
+      "status": "contracted",
+      "guards": ["tenant_configurable", "leaderboard_opt_in", "minor_safe_display"]
+    },
+    {
+      "key": "surveyFeedback",
+      "label": "Survey/feedback",
+      "roles": ["STUDENT", "PARENT", "INSTRUCTOR", "STAFF"],
+      "status": "contracted",
+      "guards": ["anonymous_mode", "response_retention", "anti_reidentification"]
+    },
+    {
+      "key": "mobilePwa",
+      "label": "Mobile PWA/offline lessons",
+      "roles": ["STUDENT", "INSTRUCTOR", "PARENT"],
+      "status": "manifest_ready",
+      "guards": ["offline_cache_allowlist", "tenant_logout_cache_purge"]
+    },
+    {
+      "key": "nativeMobileApi",
+      "label": "Native mobile API readiness",
+      "roles": ["PUBLIC"],
+      "status": "contracted",
+      "guards": ["versioned_api", "device_session_revoke", "push_subscription_scope"]
+    },
+    {
+      "key": "interoperability",
+      "label": "SCORM/xAPI/LTI interoperability",
+      "roles": ["INSTRUCTOR", "ORG_ADMIN"],
+      "status": "contracted",
+      "guards": ["package_scan", "launch_signature", "xapi_statement_validation"]
+    },
+    {
+      "key": "sisIntegration",
+      "label": "SIS integration",
+      "roles": ["ORG_ADMIN", "STAFF"],
+      "status": "contracted",
+      "guards": ["field_mapping_approval", "dry_run_import", "idempotency"]
+    },
+    {
+      "key": "sso",
+      "label": "SSO SAML/OIDC/Google/Microsoft",
+      "roles": ["ORG_ADMIN", "SUPER_ADMIN"],
+      "status": "google_partial_oidc_ready",
+      "guards": ["domain_verification", "jit_provisioning_policy", "break_glass_admin"]
+    },
+    {
+      "key": "publicWebhooks",
+      "label": "Webhook/public integration API",
+      "roles": ["ORG_ADMIN", "SUPER_ADMIN"],
+      "status": "contracted",
+      "guards": ["signed_delivery", "retry_dlq", "scoped_api_keys", "audit_log"]
+    },
+    {
+      "key": "multiLanguageContent",
+      "label": "Multi-language course content",
+      "roles": ["INSTRUCTOR", "STUDENT"],
+      "status": "contracted",
+      "guards": ["fallback_locale", "content_translation_review"]
+    },
+    {
+      "key": "aiQuizAssistant",
+      "label": "AI assistant/quiz generation",
+      "roles": ["INSTRUCTOR"],
+      "status": "privacy_teacher_approval_contract",
+      "guards": ["teacher_approval_required", "prompt_data_minimization", "generated_content_audit", "student_data_redaction"]
+    }
+  ]
+}

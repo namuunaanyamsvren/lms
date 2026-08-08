@@ -1,0 +1,3 @@
+import {EVENTS,EVENT_EXCHANGE,subscribeToEvent} from '@lms/shared';import {z} from 'zod';import {notificationInbox,notificationPrisma} from '../services/notification.service';
+const schema=z.object({organizationId:z.string().min(1),name:z.string().min(1)}).passthrough();
+export const startOrganizationCreatedConsumer=()=>subscribeToEvent(EVENT_EXCHANGE,'notification-service.organization-created.v2',EVENTS.ORGANIZATION_CREATED,async raw=>{const event=schema.parse(raw);await notificationPrisma.notificationBranding.upsert({where:{organizationId:event.organizationId},create:{organizationId:event.organizationId,organizationName:event.name},update:{organizationName:event.name}});},{deadLetter:true,inbox:notificationInbox});

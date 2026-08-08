@@ -1,0 +1,5 @@
+extends:
+  - minimal
+apis:
+  gateway:
+    root: openapi.generated.json
