@@ -171,6 +171,7 @@ model NotificationRecipient {
   updatedAt      DateTime @updatedAt
 
   @@unique([organizationId, userId])
+  @@index([organizationId, role])
 }
 
 model StudentAccessRequest {
@@ -190,7 +191,7 @@ model StudentAccessRequest {
 
   @@unique([organizationId, requesterUserId])
   @@index([organizationId, status, createdAt])
-  @@index([requesterOrganizationId, requesterUserId, status])
+  @@index([requesterOrganizationId, requesterUserId, status], map: "StudentAccessRequest_requesterOrganizationId_requesterUserId_st")
 }
 
 // Notification-service's own audit trail for state-changing actions it owns

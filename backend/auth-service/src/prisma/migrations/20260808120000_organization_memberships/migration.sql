@@ -23,16 +23,9 @@ CREATE INDEX IF NOT EXISTS "OrganizationMembership_userId_status_idx"
 CREATE INDEX IF NOT EXISTS "OrganizationMembership_organizationId_role_status_idx"
   ON "OrganizationMembership"("organizationId", "role", "status");
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'OrganizationMembership_userId_fkey'
-  ) THEN
-    ALTER TABLE "OrganizationMembership"
-      ADD CONSTRAINT "OrganizationMembership_userId_fkey"
-      FOREIGN KEY ("userId") REFERENCES "UserAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END $$;
+ALTER TABLE "OrganizationMembership"
+  ADD CONSTRAINT "OrganizationMembership_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "UserAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 INSERT INTO "OrganizationMembership" (
   "id", "organizationId", "userId", "role", "status", "source", "approvedAt", "createdAt", "updatedAt"
