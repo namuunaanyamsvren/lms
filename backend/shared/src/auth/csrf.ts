@@ -78,11 +78,12 @@ const buildCsrfCookieOptions = (): CookieOptions => {
 export const setCsrfCookie = (res: Response) => {
   const token = createCsrfToken();
   res.cookie(getCsrfCookieName(), token, buildCsrfCookieOptions());
+  return token;
 };
 
 export const issueCsrfToken = (_req: Request, res: Response) => {
-  setCsrfCookie(res);
-  return res.json({ success: true });
+  const token = setCsrfCookie(res);
+  return res.json({ success: true, data: { token, headerName: getCsrfHeaderName() } });
 };
 
 export const csrfProtection = (req: Request, _res: Response, next: NextFunction) => {
