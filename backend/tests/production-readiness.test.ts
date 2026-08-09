@@ -47,6 +47,9 @@ const baseProductionEnv = {
   QPAY_WEBHOOK_SECRET: `qpay-webhook-${strong}`,
   QPAY_CALLBACK_URL: 'https://api.example.com/api/payments/qpay/webhook',
   SENTRY_DSN: 'https://public@example.com/1',
+  PRODUCTION_SECRET_INVENTORY_EVIDENCE_URL: 'https://runbooks.example.com/secrets/latest',
+  MONITORING_ALERT_TEST_EVIDENCE_URL: 'https://runbooks.example.com/monitoring/latest',
+  PAYMENT_WEBHOOK_LIVE_VERIFICATION_URL: 'https://runbooks.example.com/payments/latest',
   BACKUP_RESTORE_DRILL_EVIDENCE_URL: 'https://runbooks.example.com/restore/latest',
 };
 
@@ -101,6 +104,27 @@ describe('production readiness validator', () => {
     expect(result.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: 'QPAY_WEBHOOK_SECRET', level: 'error' }),
+      ]),
+    );
+  });
+
+  it('turns live production evidence gaps into errors when strict sign-off is required', () => {
+    const result = validateProductionReadiness({
+      ...baseProductionEnv,
+      REQUIRE_PRODUCTION_LIVE_EVIDENCE: 'true',
+      PRODUCTION_SECRET_INVENTORY_EVIDENCE_URL: '',
+      MONITORING_ALERT_TEST_EVIDENCE_URL: '',
+      PAYMENT_WEBHOOK_LIVE_VERIFICATION_URL: '',
+      BACKUP_RESTORE_DRILL_EVIDENCE_URL: '',
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'PRODUCTION_SECRET_INVENTORY_EVIDENCE_URL', level: 'error' }),
+        expect.objectContaining({ key: 'MONITORING_ALERT_TEST_EVIDENCE_URL', level: 'error' }),
+        expect.objectContaining({ key: 'PAYMENT_WEBHOOK_LIVE_VERIFICATION_URL', level: 'error' }),
+        expect.objectContaining({ key: 'BACKUP_RESTORE_DRILL_EVIDENCE_URL', level: 'error' }),
       ]),
     );
   });

@@ -43,6 +43,20 @@ const requireHttpsUrl = (env: NodeJS.ProcessEnv, issues: ProductionReadinessIssu
   }
 };
 
+const requireEvidenceUrl = (
+  env: NodeJS.ProcessEnv,
+  issues: ProductionReadinessIssue[],
+  key: string,
+  message: string,
+) => {
+  const level: ReadinessLevel = env.REQUIRE_PRODUCTION_LIVE_EVIDENCE === 'true' ? 'error' : 'warning';
+  if (!env[key]?.trim()) {
+    add(issues, level, key, message);
+    return;
+  }
+  requireHttpsUrl(env, issues, key);
+};
+
 const requirePostgresTls = (env: NodeJS.ProcessEnv, issues: ProductionReadinessIssue[], key: string) => {
   const value = env[key]?.trim();
   if (!value) {
@@ -141,8 +155,25 @@ export function validateProductionReadiness(
   });
   requireHttpsUrl(env, issues, 'WEB_PUSH_PROVIDER_URL');
   if (!env.SENTRY_DSN?.trim() && !env.ERROR_MONITORING_DSN?.trim()) {
-    add(issues, 'warning', 'SENTRY_DSN', 'Configure SENTRY_DSN or ERROR_MONITORING_DSN before production incident monitoring handoff');
+    add(
+      issues,
+      env.REQUIRE_PRODUCTION_LIVE_EVIDENCE === 'true' ? 'error' : 'warning',
+      'SENTRY_DSN',
+      'Configure SENTRY_DSN or ERROR_MONITORING_DSN before production incident monitoring handoff',
+    );
   }
+  requireEvidenceUrl(
+    env,
+    issues,
+    'PRODUCTION_SECRET_INVENTORY_EVIDENCE_URL',
+    'Attach production secret-manager inventory evidence before launch approval',
+  );
+  requireEvidenceUrl(
+    env,
+    issues,
+    'MONITORING_ALERT_TEST_EVIDENCE_URL',
+    'Attach latest Sentry/error-monitoring alert test evidence before launch approval',
+  );
 
   if (env.FEATURE_BILLING_ENABLED === 'true') {
     ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID'].forEach(key => {
@@ -158,6 +189,12 @@ export function validateProductionReadiness(
     });
     requireHttpsUrl(env, issues, 'QPAY_API_URL');
     requireHttpsUrl(env, issues, 'QPAY_CALLBACK_URL');
+    requireEvidenceUrl(
+      env,
+      issues,
+      'PAYMENT_WEBHOOK_LIVE_VERIFICATION_URL',
+      'Attach live payment webhook verification evidence before billing launch approval',
+    );
   } else {
     add(issues, 'warning', 'FEATURE_BILLING_ENABLED', 'Billing is disabled; production launch must explicitly accept this scope');
   }
@@ -168,9 +205,12 @@ export function validateProductionReadiness(
   if (env.MALWARE_SCAN_MODE !== 'required') {
     add(issues, 'error', 'MALWARE_SCAN_MODE', 'Malware scanning must fail closed in production');
   }
-  if (!env.BACKUP_RESTORE_DRILL_EVIDENCE_URL?.trim()) {
-    add(issues, 'warning', 'BACKUP_RESTORE_DRILL_EVIDENCE_URL', 'Attach latest restore-drill evidence before launch approval');
-  }
+  requireEvidenceUrl(
+    env,
+    issues,
+    'BACKUP_RESTORE_DRILL_EVIDENCE_URL',
+    'Attach latest restore-drill evidence before launch approval',
+  );
 
   return { ready: !issues.some(issue => issue.level === 'error'), issues };
 }

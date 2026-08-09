@@ -36,7 +36,17 @@
 - `SMS_PROVIDER`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
 - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
 - `PROVIDER_WEBHOOK_SECRET`
+- `PRODUCTION_SECRET_INVENTORY_EVIDENCE_URL`: HTTPS link to the release record
+  proving production secrets were loaded from the deployment secret manager,
+  are non-placeholder values, and have an owner/rotation date.
+- `MONITORING_ALERT_TEST_EVIDENCE_URL`: HTTPS link to the latest production or
+  production-equivalent Sentry/error-monitoring alert test.
+- `PAYMENT_WEBHOOK_LIVE_VERIFICATION_URL`: HTTPS link to the latest live
+  payment-provider webhook verification record.
 - `BACKUP_RESTORE_DRILL_EVIDENCE_URL`
+- `REQUIRE_PRODUCTION_LIVE_EVIDENCE`: set to `true` for final production
+  approval. When enabled, missing production secret, monitoring alert, payment
+  webhook, or restore-drill evidence fails `npm run production:validate`.
 
 Run `npm run production:validate` before staging or production promotion. It
 fails on missing TLS, placeholder secrets, disabled provider settings, and

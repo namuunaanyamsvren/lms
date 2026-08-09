@@ -23,6 +23,22 @@ npm run production:validate
 The gate must pass for live production launches, or the release owner must
 document the exact non-applicable exception in the promotion record.
 
+For final production approval, run the same gate with live evidence required:
+
+```bash
+REQUIRE_PRODUCTION_LIVE_EVIDENCE=true npm run production:validate
+```
+
+The strict gate requires HTTPS evidence links for:
+
+- production secret-manager inventory and rotation owner;
+- latest backup/restore drill result;
+- latest Sentry/error-monitoring alert test;
+- latest live payment webhook verification when billing is enabled.
+
+Do not paste secrets into the evidence record. The record should show secret
+names, source system, last rotation/owner, and validation result only.
+
 `deploy-production.yml` is `workflow_dispatch`-only and targets the GitHub
 `production` Environment. **Required reviewers must be turned on for that
 Environment in repo Settings → Environments** — this is a one-time UI setting,
