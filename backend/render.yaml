@@ -1,0 +1,419 @@
+# Render Blueprint for the LMS backend.
+#
+# Deploy: push this file, then in the Render dashboard use
+# New -> Blueprint -> select this repo. Render will read this file and
+# prompt for every `sync: false` value below.
+#
+# See /DEPLOYMENT.md at the repo root for the full step-by-step runbook,
+# including the manual steps this file can't automate (per-service
+# DATABASE_URL schema suffixes, the CloudAMQP RABBITMQ_URL, third-party
+# credentials).
+
+databases:
+  - name: lms-postgres
+    databaseName: lms_db
+    plan: free
+    region: oregon
+
+services:
+  - type: redis
+    name: lms-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
+
+  # --- gateway ---------------------------------------------------------
+  - type: web
+    name: lms-gateway
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./gateway/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8000"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      - key: AUTH_SERVICE_URL
+        value: https://lms-auth-service.onrender.com
+      - key: ORGANIZATION_SERVICE_URL
+        value: https://lms-organization-service.onrender.com
+      - key: ACADEMIC_SERVICE_URL
+        value: https://lms-academic-service.onrender.com
+      - key: BILLING_SERVICE_URL
+        value: https://lms-billing-service.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        value: https://lms-notification-service.onrender.com
+      - key: FEATURE_BILLING_ENABLED
+        value: "false"
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRES_IN
+        value: 15m
+      - key: CSRF_HEADER_NAME
+        value: x-csrf-token
+      # Fill these in during the Blueprint wizard (or right after) once
+      # the Vercel frontend URL is known. Every other service reads them
+      # via fromService below, so they only need to be set here.
+      - key: FRONTEND_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: TENANT_BASE_DOMAIN
+        sync: false
+
+  # --- auth-service ------------------------------------------------------
+  - type: web
+    name: lms-auth-service
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./auth-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8001"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      # Base Postgres connection string from lms-postgres; append
+      # ?schema=auth by hand (see DEPLOYMENT.md) — Blueprint syntax can't
+      # concatenate a fromDatabase value with a suffix.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      # CloudAMQP amqps:// URL, pasted once here; propagated to the other
+      # services below via fromService.
+      - key: RABBITMQ_URL
+        sync: false
+      - key: ACCESS_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ACCESS_TOKEN_SECRET
+      - key: REFRESH_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: REFRESH_TOKEN_SECRET
+      - key: ACCESS_TOKEN_EXPIRES_IN
+        value: 15m
+      - key: REFRESH_TOKEN_EXPIRES_IN
+        value: 7d
+      - key: REFRESH_COOKIE_NAME
+        value: lms_refresh
+      - key: REFRESH_COOKIE_PATH
+        value: /api/auth
+      - key: REFRESH_COOKIE_SAME_SITE
+        value: lax
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: FRONTEND_URL
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ALLOWED_ORIGINS
+      - key: CSRF_COOKIE_NAME
+        value: lms_csrf
+      - key: CSRF_HEADER_NAME
+        value: x-csrf-token
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: SERVICE_TOKEN_SECRET
+        generateValue: true
+      - key: PHONE_OTP_HASH_SECRET
+        generateValue: true
+      - key: SMS_PROVIDER
+        value: twilio
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: PASSWORD_COMPROMISED_CHECK_ENABLED
+        value: "true"
+      - key: PASSWORD_COMPROMISED_CHECK_FAILURE_MODE
+        value: allow
+      - key: ORGANIZATION_SERVICE_URL
+        value: https://lms-organization-service.onrender.com
+      - key: ACADEMIC_SERVICE_URL
+        value: https://lms-academic-service.onrender.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # https://<your gateway URL>/api/v1/auth/google/callback
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+
+  # --- organization-service ----------------------------------------------
+  - type: web
+    name: lms-organization-service
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./organization-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8002"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      # Base Postgres connection string from lms-postgres; append
+      # ?schema=organization by hand (see DEPLOYMENT.md).
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RABBITMQ_URL
+      - key: ACCESS_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ACCESS_TOKEN_SECRET
+      - key: SERVICE_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: SERVICE_TOKEN_SECRET
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ALLOWED_ORIGINS
+      - key: TENANT_BASE_DOMAIN
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: TENANT_BASE_DOMAIN
+      - key: AUTH_SERVICE_URL
+        value: https://lms-auth-service.onrender.com
+      - key: ACADEMIC_SERVICE_URL
+        value: https://lms-academic-service.onrender.com
+      - key: BILLING_SERVICE_URL
+        value: https://lms-billing-service.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        value: https://lms-notification-service.onrender.com
+      - key: FEATURE_BILLING_ENABLED
+        value: "false"
+
+  # --- academic-service ----------------------------------------------
+  - type: web
+    name: lms-academic-service
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./academic-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8003"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      # Base Postgres connection string from lms-postgres; append
+      # ?schema=academic by hand (see DEPLOYMENT.md).
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RABBITMQ_URL
+      - key: ACCESS_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ACCESS_TOKEN_SECRET
+      - key: SERVICE_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: SERVICE_TOKEN_SECRET
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ALLOWED_ORIGINS
+      - key: AUTH_SERVICE_URL
+        value: https://lms-auth-service.onrender.com
+      - key: BILLING_SERVICE_URL
+        value: https://lms-billing-service.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        value: https://lms-notification-service.onrender.com
+      - key: FEATURE_BILLING_ENABLED
+        value: "false"
+      - key: FILE_SIGNING_SECRET
+        generateValue: true
+      - key: FILE_DOWNLOAD_BASE_URL
+        value: https://lms-gateway.onrender.com/api/uploads/download
+      - key: FILE_STORAGE_DIRECTORY
+        value: /data/private-uploads
+      - key: FILE_STORAGE_AT_REST_ENCRYPTED
+        value: "false"
+      - key: MALWARE_SCAN_MODE
+        value: disabled
+
+  # --- billing-service ----------------------------------------------
+  - type: web
+    name: lms-billing-service
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./billing-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8004"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      # Base Postgres connection string from lms-postgres; append
+      # ?schema=billing by hand (see DEPLOYMENT.md).
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RABBITMQ_URL
+      - key: ACCESS_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ACCESS_TOKEN_SECRET
+      - key: SERVICE_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: SERVICE_TOKEN_SECRET
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ALLOWED_ORIGINS
+      - key: AUTH_SERVICE_URL
+        value: https://lms-auth-service.onrender.com
+      - key: ORGANIZATION_SERVICE_URL
+        value: https://lms-organization-service.onrender.com
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: QPAY_API_URL
+        sync: false
+      - key: QPAY_CLIENT_ID
+        sync: false
+      - key: QPAY_CLIENT_SECRET
+        sync: false
+      - key: QPAY_WEBHOOK_SECRET
+        sync: false
+
+  # --- notification-service ----------------------------------------------
+  - type: web
+    name: lms-notification-service
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./notification-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "8005"
+      - key: REQUIRE_INTERNAL_TLS
+        value: "true"
+      # Base Postgres connection string from lms-postgres; append
+      # ?schema=notification by hand (see DEPLOYMENT.md).
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lms-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RABBITMQ_URL
+      - key: ACCESS_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ACCESS_TOKEN_SECRET
+      - key: SERVICE_TOKEN_SECRET
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: SERVICE_TOKEN_SECRET
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: ALLOWED_ORIGINS
+      - key: AUTH_SERVICE_URL
+        value: https://lms-auth-service.onrender.com
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
