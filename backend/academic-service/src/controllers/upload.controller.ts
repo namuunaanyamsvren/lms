@@ -41,7 +41,7 @@ export const inspectFile = async (req: Request, res: Response) => {
   const filename = req.header('x-file-name') || '';
   const upload = inspectUpload(req.body, req.header('content-type') || '', filename);
   const scan = await scanUploadForMalware(
-    req.body,
+    upload.content,
     upload.filename,
     upload.sha256,
   );
@@ -53,7 +53,7 @@ export const inspectFile = async (req: Request, res: Response) => {
   }
   const target = resolveStoragePath(storageKey);
   await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-  await writeFile(target, req.body, { flag: 'wx', mode: 0o600 });
+  await writeFile(target, upload.content, { flag: 'wx', mode: 0o600 });
   let asset: { id: string };
   try {
     asset = await prisma.fileAsset.create({
@@ -78,6 +78,7 @@ export const inspectFile = async (req: Request, res: Response) => {
     success: true,
     data: {
       ...upload,
+      content: undefined,
       storageKey,
       assetId: asset.id,
       malwareScan: scan,

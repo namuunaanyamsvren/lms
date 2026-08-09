@@ -148,7 +148,7 @@ export async function subscribeToEvent(
             queue,
             eventId: envelope?.eventId,
             retries,
-            error: message,
+            failed: true,
           })
         );
         if (options.deadLetter && !poison && retries < maxRetries) {

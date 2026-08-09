@@ -90,10 +90,11 @@ export const storeReportFile = async (
   mimeType: string,
 ) => {
   const safeFilename = sanitizeUploadFilename(filename);
+  const content = Buffer.from(buffer);
   const storageKey = `${organizationId}/reports/${crypto.randomUUID()}/${safeFilename}`;
   const target = resolveStoragePath(storageKey);
   await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-  await writeFile(target, buffer, { mode: 0o600 });
+  await writeFile(target, content, { mode: 0o600 });
   const asset = await prisma.fileAsset.create({
     data: {
       organizationId,
@@ -101,8 +102,8 @@ export const storeReportFile = async (
       storageKey,
       originalName: safeFilename,
       mimeType,
-      size: buffer.length,
-      sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+      size: content.length,
+      sha256: crypto.createHash('sha256').update(content).digest('hex'),
       scanStatus: 'CLEAN',
       purpose: 'REPORT_EXPORT',
     },

@@ -84,17 +84,19 @@ export type InspectedUpload = {
   detectedMime: string;
   size: number;
   sha256: string;
+  content: Buffer;
 };
 
 export function inspectUpload(
-  buffer: Buffer,
+  input: unknown,
   declaredMime: unknown,
   originalFilename: unknown,
   maxBytes = DEFAULT_UPLOAD_MAX_BYTES,
 ): InspectedUpload {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+  if (!Buffer.isBuffer(input) || input.length === 0) {
     throw AppError.badRequest('Upload body is empty');
   }
+  const buffer = Buffer.from(input);
   if (buffer.length > maxBytes) {
     throw new AppError('Upload exceeds the permitted size', 413);
   }
@@ -138,6 +140,7 @@ export function inspectUpload(
     detectedMime: normalizedMime,
     size: buffer.length,
     sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+    content: buffer,
   };
 }
 
