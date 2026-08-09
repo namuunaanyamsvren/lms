@@ -1,127 +1,143 @@
-import { useState, useEffect } from 'react';
-import { BarChart2, BookOpen, Calendar, FileCheck, Star } from 'lucide-react';
-import DashboardTemplate from '../../components/dashboard/DashboardTemplate';
-import {
-  DashboardActivityFeed,
-  DashboardInfoRows,
-  DashboardListCard,
-  DashboardMetricCard,
-  DashboardProgressList,
-} from '../../components/dashboard/DashboardWidgets';
-import { CalendarMini } from './DashboardWidgets.local';
-import { getStudentDashboardData } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { getStudentDashboardData } from '../../services/api';
+import { BookOpen, FileCheck2, Activity, Bell, ArrowRight } from 'lucide-react';
+
+const formatDateTime = (value) => new Date(value).toLocaleString('mn-MN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export default function Student() {
-  const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['dashboards', 'student'],
+    queryFn: getStudentDashboardData,
+  });
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getStudentDashboardData();
-        setDashboardData(data);
-      } catch (err) {
-        setError('Дашбордын мэдээллийг ачааллахад алдаа гарлаа.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, []);
-
-  const studentName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.email : 'Оюутан';
-
-  if (loading) {
-    return (
-      <DashboardTemplate
-        title={`Сайн байна уу, ${studentName}!`}
-        subtitle="Таны суралцах идэвхжлийн тоймыг ачааллаж байна..."
-      >
-        <div>Ачааллаж байна...</div>
-      </DashboardTemplate>
-    );
+  if (isLoading) {
+    return <div className="flex min-h-[60vh] items-center justify-center"><LoadingSpinner /></div>;
   }
-
-  if (error) {
+  if (isError || !data) {
     return (
-      <DashboardTemplate title="Алдаа гарлаа" subtitle={error}>
-        <Card>
-          <p>Дахин оролдоно уу. Хэрэв алдаа засагдахгүй бол системийн админд хандана уу.</p>
-        </Card>
-      </DashboardTemplate>
+      <div className="space-y-6">
+        <PageHeader title="Хяналтын самбар" subtitle="Таны сургалтын үйл ажиллагааны тойм." />
+        <Card><p className="text-sm text-rose-600">Мэдээлэл ачаалахад алдаа гарлаа.</p></Card>
+      </div>
     );
   }
 
   const stats = [
-    { title: 'Хичээл', value: dashboardData.stats.courses, delta: 'Идэвхтэй', icon: BookOpen },
-    { title: 'Даалгавар', value: dashboardData.stats.assignments, delta: 'Хүлээгдэж буй', icon: FileCheck },
-    { title: 'Шалгалт', value: dashboardData.stats.exams, delta: 'Товлогдсон', icon: Star },
-    { title: 'Суралцсан цаг', value: `${dashboardData.stats.studyHours}ц`, delta: `+${dashboardData.stats.studyHoursDelta}ц`, icon: Calendar },
+    { title: 'Хичээлүүд', value: data.stats.courses, icon: BookOpen, href: '/student/courses' },
+    { title: 'Даалгавар', value: data.stats.assignments, icon: FileCheck2, href: '/student/assignments' },
+    { title: 'Шалгалт', value: data.stats.exams, icon: Activity, href: '/student/quizzes' },
+    { title: 'Ирцийн хувь', value: data.engagement?.value || '—', icon: Bell, href: '/student/attendance' },
   ];
 
   return (
-    <DashboardTemplate
-      title={`Сайн байна уу, ${studentName}!`}
-      subtitle="Таны суралцах идэвхжлийн тойм (PostgreSQL Баазаас ачааллаа)."
-      stats={stats}
-      leftColumn={
-        <>
-          <DashboardProgressList
-            title="Хичээлийн явц"
-            subtitle="Идэвхтэй хичээлүүдийн явц"
-            items={dashboardData.courseProgress}
-          />
+    <div className="space-y-6">
+      <PageHeader title="Тавтай морил" subtitle="Таны сургалтын үйл ажиллагааны тойм." />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <DashboardListCard
-              title="Ойрын даалгавар (DB)"
-              items={dashboardData.upcomingAssignments.map(a => ({ ...a, subtitle: `Хугацаа: ${new Date(a.subtitle).toLocaleDateString('mn-MN')}`}))}
-              actionLabel="Харах"
-            />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s, i) => (
+          <Link key={i} to={s.href}>
+            <StatCard title={s.title} value={s.value} icon={s.icon} />
+          </Link>
+        ))}
+      </div>
 
-            <DashboardListCard
-              title="Өнөөдрийн хичээл"
-              items={dashboardData.todayClasses.map((c) => ({
-                title: c.title,
-                subtitle: 'Лекцийн өрөө • Баазаас ачаалсан',
-              }))}
-              actionLabel="Оролцох"
-            />
-          </div>
-        </>
-      }
-      rightColumn={
-        <>
-          <CalendarMini />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card
+            title="Дараагийн даалгаврууд"
+            subtitle="Хугацаа дуусахаас өмнө илгээгээрэй"
+            right={<Link to="/student/assignments" className="text-xs font-semibold text-indigo-600 flex items-center gap-1">Бүгд <ArrowRight size={13} /></Link>}
+          >
+            {data.upcomingAssignments.length === 0 ? (
+              <p className="text-sm text-slate-500">Дараагийн даалгавар алга.</p>
+            ) : (
+              <ul className="space-y-3">
+                {data.upcomingAssignments.map((a, i) => (
+                  <li key={i} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-slate-700 text-sm">{a.title}</div>
+                      <div className="text-xs text-slate-500">Хугацаа: {formatDateTime(a.subtitle)}</div>
+                    </div>
+                    <Link to="/student/assignments" className="text-sm text-indigo-600">Харах</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-          <DashboardInfoRows
-            title="Сүүлийн дүн (DB)"
-            items={dashboardData.recentGrades}
-          />
+          <Card title="Өнөөдрийн хичээлүүд" right={<Link to="/student/schedules" className="text-xs font-semibold text-indigo-600 flex items-center gap-1">Хуваарь <ArrowRight size={13} /></Link>}>
+            {data.todayClasses.length === 0 ? (
+              <p className="text-sm text-slate-500">Өнөөдөр хичээл алга.</p>
+            ) : (
+              <ul className="space-y-3">
+                {data.todayClasses.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">{c.course?.title}</div>
+                      <div className="text-xs text-slate-500">{c.startTime} - {c.endTime}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
 
-          <DashboardListCard
-            title="Мэдэгдэл"
-            items={dashboardData.notifications}
-          />
+        <div className="space-y-6">
+          <Card title="Сүүлийн дүнгүүд" right={<Link to="/student/grades" className="text-xs font-semibold text-indigo-600 flex items-center gap-1">Бүгд <ArrowRight size={13} /></Link>}>
+            {data.recentGrades.length === 0 ? (
+              <p className="text-sm text-slate-500">Дүн алга байна.</p>
+            ) : (
+              <ul className="space-y-2">
+                {data.recentGrades.map((g, i) => (
+                  <li key={i} className="flex items-center justify-between">
+                    <div className="text-sm text-slate-700">{g.label}</div>
+                    <div className="font-semibold">{g.value}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-          <DashboardMetricCard
-            title="Суралцах идэвх"
-            subtitle="Сүүлийн 7 хоног"
-            value={dashboardData.engagement.value}
-            icon={BarChart2}
-          />
-        </>
-      }
-      bottomSection={
-        <DashboardActivityFeed title="Сүүлийн үйл ажиллагаа" items={dashboardData.activityFeed} />
-      }
-    />
+          <Card title="Мэдэгдэл" right={<Link to="/notifications" className="text-xs font-semibold text-indigo-600 flex items-center gap-1">Бүгд <ArrowRight size={13} /></Link>}>
+            {data.notifications.length === 0 ? (
+              <p className="text-sm text-slate-500">Шинэ мэдэгдэл алга.</p>
+            ) : (
+              <ul className="space-y-2 text-sm text-slate-600">
+                {data.notifications.map((n, i) => (
+                  <li key={i} className="py-2 border-b border-gray-100 last:border-0">
+                    <div className="font-medium text-slate-700">{n.title}</div>
+                    <div className="text-xs text-slate-500">{n.subtitle}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      <Card title="Сүүлийн үйл ажиллагаа">
+        {data.activityFeed.length === 0 ? (
+          <p className="text-sm text-slate-500">Үйл ажиллагаа алга байна.</p>
+        ) : (
+          <ul className="space-y-3">
+            {data.activityFeed.map((a, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <div className={`w-2.5 h-2.5 mt-2 rounded-full ${a.active ? 'bg-indigo-500' : 'bg-slate-300'}`} />
+                <div>
+                  <div className="text-sm text-slate-700">{a.title}</div>
+                  <div className="text-xs text-slate-500">{a.time}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }

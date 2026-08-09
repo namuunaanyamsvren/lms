@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lms.local/schemas/events/event-envelope.v1.schema.json",
+  "title": "LMS event envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "version", "occurredAt", "traceId", "organizationId", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "version": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "traceId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "organizationId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "payload": { "type": "object" }
+  }
+}

@@ -1,0 +1,123 @@
+name: Release candidate gates
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: test
+          RABBITMQ_DEFAULT_PASS: test
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+    env:
+      NODE_ENV: test
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=auth
+      AUTH_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=auth
+      ORGANIZATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=organization
+      ACADEMIC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=academic
+      BILLING_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=billing
+      NOTIFICATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=notification
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=shadow
+      MIGRATION_DATABASE_NAME: lms_test
+      SHADOW_DATABASE_NAME: lms_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://test:test@localhost:5672
+      ACCESS_TOKEN_SECRET: test-access-secret-with-at-least-forty-three-characters
+      REFRESH_TOKEN_SECRET: test-refresh-secret-with-at-least-forty-three-characters
+      SERVICE_TOKEN_SECRET: test-service-secret-with-at-least-forty-three-characters
+      CSRF_SECRET: test-csrf-secret-with-at-least-forty-three-characters
+      PHONE_OTP_HASH_SECRET: test-phone-secret-with-at-least-forty-three-characters
+      GOOGLE_CLIENT_ID: rc-test.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: rc-google-secret
+      GOOGLE_REDIRECT_URI: http://localhost:5173/auth/callback
+      ALLOWED_ORIGINS: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
+      PROVIDER_WEBHOOK_SECRET: rc-provider-webhook-secret
+      QPAY_API_URL: https://qpay-ci.example.test
+      QPAY_CLIENT_ID: rc-qpay-client
+      QPAY_CLIENT_SECRET: rc-qpay-secret
+      QPAY_WEBHOOK_SECRET: rc-qpay-webhook-secret
+      QPAY_CALLBACK_URL: http://localhost:8080/api/v1/billing/qpay/webhook
+      SMS_PROVIDER: mock
+      SMS_PROVIDER_URL: https://sms-ci.example.test/send
+      SMS_PROVIDER_TOKEN: rc-sms-token
+      WEB_PUSH_PROVIDER_URL: https://push-ci.example.test
+      WEB_PUSH_PROVIDER_TOKEN: rc-push-token
+      SENTRY_DSN: https://public@example.com/1
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Wait for infrastructure readiness
+        run: |
+          node -e "const net=require('node:net'); const targets=[['postgres',5432],['redis',6379],['rabbitmq',5672]]; const wait=([name,port])=>new Promise((resolve,reject)=>{let tries=0; const attempt=()=>{const socket=net.connect(port,'127.0.0.1'); socket.setTimeout(1000); socket.on('connect',()=>{socket.end(); console.log(name,'ready'); resolve();}); socket.on('error',retry); socket.on('timeout',()=>{socket.destroy(); retry();}); function retry(){if(++tries>60) reject(new Error(name+' not ready on '+port)); else setTimeout(attempt,1000);}}; attempt();}); Promise.all(targets.map(wait)).catch(error=>{console.error(error); process.exit(1);});"
+          printf 'SELECT 1;' | npm exec --prefix backend -- prisma db execute --url "$DATABASE_URL" --stdin
+          node -e "const Redis=require('./backend/node_modules/ioredis'); const redis=new Redis(process.env.REDIS_URL); redis.ping().then(value=>{console.log('redis ping',value); return redis.quit();}).catch(error=>{console.error(error); process.exit(1);});"
+          node -e "const amqp=require('./backend/node_modules/amqplib'); amqp.connect(process.env.RABBITMQ_URL).then(async conn=>{console.log('rabbitmq connected'); await conn.close();}).catch(error=>{console.error(error); process.exit(1);});"
+      - name: Real database smoke
+        run: npm run smoke:db
+      - name: Migration drift check
+        run: npm run prisma:check-drift --prefix backend
+      - name: Backend build and tests
+        run: |
+          npm run build --prefix backend
+          npm test --prefix backend
+      - name: Frontend build and tests
+        run: |
+          npm run build --prefix frontend
+          npm test --prefix frontend
+      - name: OpenAPI coverage
+        run: npm run openapi:validate --prefix backend
+      - name: Production deploy-readiness dry run
+        run: npm run verify:deploy

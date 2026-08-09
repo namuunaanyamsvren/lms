@@ -1,0 +1,2 @@
+ALTER TABLE "UserAccount"
+  ALTER COLUMN "role" SET DEFAULT 'USER';

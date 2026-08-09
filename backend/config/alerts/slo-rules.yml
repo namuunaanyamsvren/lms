@@ -1,0 +1,35 @@
+groups:
+  - name: lms-slo-alerts
+    rules:
+      - alert: HighApiErrorRate
+        expr: sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: API 5xx rate is above 1%
+          runbook: backend/docs/operations-runbook.md
+      - alert: HighApiLatency
+        expr: http_request_duration_ms{quantile="0.95"} > 1500
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: API p95 latency is above 1500ms
+          runbook: backend/docs/operations-runbook.md
+      - alert: ServiceNotReady
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: A monitored service target is down
+          runbook: backend/docs/operations-runbook.md
+      - alert: QueueBacklog
+        expr: lms_queue_ready_messages{quantile="0.95"} > 1000
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: RabbitMQ queue backlog is elevated
+          runbook: backend/docs/operations-runbook.md

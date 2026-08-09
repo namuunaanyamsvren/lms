@@ -3,10 +3,10 @@ import FadeContent from '../reactbits/FadeContent';
 
 export default function CTASection() {
   return (
-    <section className="bg-[#4f46e5] py-20">
+    <section className="bg-primary py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeContent distance={40} duration={0.7} blur={true}>
-          <div className="rounded-[2rem] border border-indigo-400/30 bg-[#4f46e5] p-10 text-center shadow-2xl sm:p-14">
+          <div className="rounded-[2rem] border border-indigo-400/30 bg-primary p-10 text-center shadow-2xl sm:p-14">
             <p className="text-sm font-semibold uppercase tracking-[0.32em] text-indigo-100">Сургуульдаа нэгдсэн систем нэвтрүүлэхэд бэлэн үү?</p>
             <h2 className="mt-5 text-4xl sm:text-5xl font-semibold text-white">Системийг үнэгүй туршиж, сургуулийнхаа бүтээмжийг нэмэгдүүлээрэй.</h2>
             <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-indigo-100">

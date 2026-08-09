@@ -9,49 +9,49 @@ export default function HelpCenter() {
   const faqs = [
     {
       id: 1,
-      question: 'How do I reset my password?',
-      answer: 'Go to Settings > Security and click on "Change Password". You will need to enter your current password and then create a new one.',
+      question: 'Нууц үгээ хэрхэн шинэчлэх вэ?',
+      answer: 'Тохиргоо хэсгийн Аюулгүй байдал руу орж “Нууц үг солих”-ыг сонгоно.',
     },
     {
       id: 2,
-      question: 'How can I access my courses?',
-      answer: 'Your enrolled courses are available in the "My Courses" section of your dashboard. Click on any course to view its content and continue learning.',
+      question: 'Хичээлүүдээ хаанаас харах вэ?',
+      answer: 'Бүртгэлтэй хичээлүүд “Миний хичээлүүд” хэсэгт харагдана.',
     },
     {
       id: 3,
-      question: 'How do I submit assignments?',
-      answer: 'Navigate to the Assignments section, select the assignment you want to submit, and follow the instructions to upload your work.',
+      question: 'Даалгавраа хэрхэн илгээх вэ?',
+      answer: 'Даалгавар хэсгээс илгээх ажлаа сонгон зааврын дагуу материалаа оруулна.',
     },
     {
       id: 4,
-      question: 'Where can I view my grades?',
-      answer: 'Your grades are available in the Grades section of your dashboard. You can filter by course or semester to find specific grades.',
+      question: 'Дүнгээ хаанаас харах вэ?',
+      answer: 'Хянах самбарын Дүн хэсэгт таны бүх дүн харагдана.',
     },
     {
       id: 5,
-      question: 'How do I contact my instructor?',
-      answer: 'You can contact your instructor through the Messages section or by using the contact information provided in the course details.',
+      question: 'Багштайгаа хэрхэн холбогдох вэ?',
+      answer: 'Хичээлийн дэлгэрэнгүй мэдээлэлд байгаа багшийн холбоо барих мэдээллийг ашиглана.',
     },
   ];
 
   const helpCategories = [
-    { title: 'Getting Started', icon: Book, items: 12, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
-    { title: 'Video Tutorials', icon: Video, items: 8, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
-    { title: 'Documentation', icon: FileText, items: 15, color: 'text-green-600 bg-green-50 dark:bg-green-900/20' },
-    { title: 'Community', icon: Users, items: 24, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' },
+    { title: 'Эхлэх заавар', icon: Book, items: 12, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
+    { title: 'Видео заавар', icon: Video, items: 8, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
+    { title: 'Баримт бичиг', icon: FileText, items: 15, color: 'text-green-600 bg-green-50 dark:bg-green-900/20' },
+    { title: 'Хэрэглэгчдийн бүлэг', icon: Users, items: 24, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' },
   ];
 
   const contactMethods = [
-    { title: 'Live Chat', icon: MessageCircle, description: 'Chat with our support team', available: '24/7' },
-    { title: 'Email Support', icon: Mail, description: 'support@lms.edu', available: 'Response within 24h' },
-    { title: 'Phone Support', icon: Phone, description: '+1 (555) 123-4567', available: 'Mon-Fri 9-5' },
+    { title: 'Шууд чат', icon: MessageCircle, description: 'Тусламжийн багтай чатлах', available: '24/7' },
+    { title: 'И-мэйл тусламж', icon: Mail, description: 'support@lms.edu', available: '24 цагийн дотор хариулна' },
+    { title: 'Утасны тусламж', icon: Phone, description: '+976 7000-0000', available: 'Даваа–Баасан 09:00–17:00' },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Help Center" 
-        subtitle="Find answers to your questions and get support"
+        title="Тусламж"
+        subtitle="Асуултынхаа хариултыг олж, тусламж аваарай"
       />
 
       {/* Search */}
@@ -59,7 +59,7 @@ export default function HelpCenter() {
         <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
-          placeholder="Search for help articles, FAQs, and more..."
+          placeholder="Тусламжийн мэдээлэл хайх..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-12 pr-4 py-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -76,7 +76,7 @@ export default function HelpCenter() {
                 <Icon size={24} />
               </div>
               <h3 className="font-semibold text-slate-900 dark:text-slate-100">{category.title}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{category.items} articles</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{category.items} нийтлэл</p>
               <ChevronRight size={16} className="text-slate-400 mt-4" />
             </button>
           );
@@ -87,7 +87,7 @@ export default function HelpCenter() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center gap-3 mb-6">
           <HelpCircle size={24} className="text-indigo-600" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Frequently Asked Questions</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Түгээмэл асуултууд</h3>
         </div>
         
         <div className="space-y-3">
@@ -115,7 +115,7 @@ export default function HelpCenter() {
 
       {/* Contact Methods */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">Contact Support</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">Тусламжтай холбогдох</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {contactMethods.map((method) => {

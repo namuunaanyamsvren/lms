@@ -1,5 +1,6 @@
 import HeroSection from '../../components/landing/HeroSection';
 import FeaturesSection from '../../components/landing/FeaturesSection';
+import ImageShowcase from '../../components/landing/ImageShowcase';
 import DashboardPreview from '../../components/landing/DashboardPreview';
 import UniversitySection from '../../components/landing/UniversitySection';
 import RoleOverview from '../../components/landing/RoleOverview';
@@ -13,6 +14,7 @@ export default function Landing() {
     <div className="bg-white">
       <HeroSection />
       <FeaturesSection />
+      <ImageShowcase />
       <DashboardPreview />
       <UniversitySection />
       <RoleOverview />

@@ -1,5 +1,6 @@
 node_modules
 dist
+**/dist/
 build
 .env
 *.log
@@ -7,3 +8,4 @@ build
 coverage
 prisma/*.db
 .turbo
+openapi.generated.json

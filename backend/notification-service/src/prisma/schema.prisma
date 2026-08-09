@@ -5,24 +5,249 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-notification"
 }
 
 enum NotificationType {
   EMAIL
   IN_APP
   PUSH
+  SMS
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  RETRYING
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+  DEAD_LETTER
+  SKIPPED
+}
+
+enum DigestMode {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  NONE
+}
+
+enum StudentAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 model Notification {
-  id             String           @id @default(uuid())
+  id             String                 @id @default(uuid())
   organizationId String
   userId         String
   title          String
   body           String
-  type           NotificationType @default(IN_APP)
-  isRead         Boolean          @default(false)
-  createdAt      DateTime         @default(now())
+  type           NotificationType       @default(IN_APP)
+  eventType      String                 @default("GENERAL")
+  idempotencyKey String
+  metadataJson   String?
+  isRead         Boolean                @default(false)
+  expiresAt      DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  deliveries     NotificationDelivery[]
 
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId])
-  @@index([userId])
+  @@index([organizationId, userId, isRead, createdAt])
+}
+
+model NotificationDelivery {
+  id                String           @id @default(uuid())
+  organizationId    String
+  notificationId    String
+  notification      Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  channel           NotificationType
+  recipient         String?
+  status            DeliveryStatus   @default(PENDING)
+  provider          String?
+  providerMessageId String?
+  attemptCount      Int              @default(0)
+  nextAttemptAt     DateTime?
+  lastAttemptAt     DateTime?
+  deliveredAt       DateTime?
+  lastError         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([notificationId, channel])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, providerMessageId])
+}
+
+model NotificationPreference {
+  id               String                        @id @default(uuid())
+  organizationId   String
+  userId           String
+  digestMode       DigestMode                    @default(IMMEDIATE)
+  timezone         String                        @default("UTC")
+  emailEnabled     Boolean                       @default(true)
+  inAppEnabled     Boolean                       @default(true)
+  pushEnabled      Boolean                       @default(false)
+  smsEnabled       Boolean                       @default(false)
+  quietHoursStart  String?
+  quietHoursEnd    String?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  eventPreferences NotificationEventPreference[]
+
+  @@unique([organizationId, userId])
+}
+
+model NotificationEventPreference {
+  id             String                 @id @default(uuid())
+  organizationId String
+  preferenceId   String
+  preference     NotificationPreference @relation(fields: [preferenceId], references: [id], onDelete: Cascade)
+  eventType      String
+  email          Boolean?
+  inApp          Boolean?
+  push           Boolean?
+  sms            Boolean?
+
+  @@unique([organizationId, preferenceId, eventType])
+}
+
+model NotificationTemplate {
+  id              String   @id @default(uuid())
+  organizationId  String
+  eventType       String
+  locale          String   @default("mn")
+  subjectTemplate String
+  htmlTemplate    String
+  textTemplate    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, eventType, locale])
+}
+
+model NotificationBranding {
+  id               String   @id @default(uuid())
+  organizationId   String   @unique
+  organizationName String
+  logoUrl          String?
+  primaryColor     String   @default("#4F46E5")
+  supportEmail     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PushSubscription {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  endpoint       String
+  p256dh         String
+  auth           String
+  userAgent      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, userId, endpoint])
+  @@index([organizationId, userId])
+}
+
+model NotificationRecipient {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  email          String?
+  phone          String?
+  firstName      String?
+  role           String?
+  locale         String   @default("mn")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+}
+
+model StudentAccessRequest {
+  id                      String                     @id @default(uuid())
+  organizationId          String
+  requesterOrganizationId String
+  requesterUserId         String
+  requesterEmail          String?
+  requesterName           String?
+  note                    String?
+  status                  StudentAccessRequestStatus @default(PENDING)
+  reviewedByUserId        String?
+  reviewerNote            String?
+  reviewedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  @@unique([organizationId, requesterUserId])
+  @@index([organizationId, status, createdAt])
+  @@index([requesterOrganizationId, requesterUserId, status], map: "StudentAccessRequest_requesterOrganizationId_requesterUserId_st")
+}
+
+// Notification-service's own audit trail for state-changing actions it owns
+// (e.g. approving/rejecting a StudentAccessRequest). Mirrors academic-service's
+// AuditLog shape/pattern, but is a separate table by necessity — each service
+// has its own database, there is no single shared cross-service audit table
+// in this architecture.
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         String
+  entity         String
+  entityId       String?
+  details        String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+}
+
+model DeadLetter {
+  id             String    @id @default(uuid())
+  organizationId String?
+  eventType      String
+  idempotencyKey String?
+  payloadJson    String
+  error          String
+  attempts       Int
+  createdAt      DateTime  @default(now())
+  replayedAt     DateTime?
+
+  @@index([createdAt])
+}
+
+model ProviderEvent {
+  id                String   @id @default(uuid())
+  provider          String
+  providerEventId   String
+  providerMessageId String?
+  type              String
+  payloadJson       String
+  receivedAt        DateTime @default(now())
+
+  @@unique([provider, providerEventId])
+}
+
+model EventInbox {
+  id String @id @default(uuid())
+  eventId String
+  consumer String
+  eventType String
+  status String @default("PROCESSING")
+  error String?
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+  @@unique([eventId, consumer])
+  @@index([status, receivedAt])
 }

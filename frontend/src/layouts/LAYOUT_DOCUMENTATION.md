@@ -71,14 +71,14 @@
  *   - /dashboard/* (nested routes)
  * 
  * Features:
- *   ✓ Responsive design (mobile-first)
- *   ✓ Collapsible sidebar (desktop)
- *   ✓ Mobile overlay menu
- *   ✓ Dropdown user menu
- *   ✓ Notification badge
- *   ✓ Smooth animations
- *   ✓ Tailwind CSS utility classes
- *   ✓ Lucide React icons
+ *   - Responsive design (mobile-first)
+ *   - Collapsible sidebar (desktop)
+ *   - Mobile overlay menu
+ *   - Dropdown user menu
+ *   - Notification badge
+ *   - Smooth animations
+ *   - Tailwind CSS utility classes
+ *   - Lucide React icons
  */
 
 /**

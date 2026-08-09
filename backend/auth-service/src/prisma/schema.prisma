@@ -9,52 +9,183 @@ generator client {
 }
 
 enum Role {
+  USER
   SUPER_ADMIN
   ORG_ADMIN
   INSTRUCTOR
   STUDENT
   PARENT
+  FINANCE
   STAFF
   PRINCIPAL
 }
 
+enum UserAccountStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum AuthAuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  ACCOUNT_LOCKED
+  LOGOUT
+  LOGOUT_ALL
+  TOKEN_REFRESH
+  TOKEN_REUSE_DETECTED
+  SESSION_REVOKED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+  EMAIL_VERIFIED
+  PHONE_VERIFIED
+  ACCOUNT_ANONYMIZED
+}
+
 model UserAccount {
-  id               String               @id @default(uuid())
-  organizationId   String
-  username         String?
-  email            String
-  phone            String?
-  passwordHash     String
-  firstName        String?
-  lastName         String?
-  role             Role                 @default(STUDENT)
-  isActive         Boolean              @default(true)
-  isEmailVerified  Boolean              @default(false)
-  isPhoneVerified  Boolean              @default(false)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  refreshTokens    RefreshToken[]
-  resetTokens      PasswordResetToken[]
+  id                 String               @id @default(uuid())
+  organizationId     String
+  username           String?
+  email              String
+  phone              String?
+  passwordHash       String
+  firstName          String?
+  lastName           String?
+  role               Role                 @default(USER)
+  status             UserAccountStatus     @default(ACTIVE)
+  isActive           Boolean              @default(true)
+  studentId          String?
+  guardianLinkCode   String?
+  employeeId         String?
+  profileImageKey    String?
+  language           String               @default("mn")
+  timezone           String               @default("Asia/Ulaanbaatar")
+  notificationPreferences Json            @default("{}")
+  invitedAt          DateTime?
+  invitedById        String?
+  isEmailVerified    Boolean              @default(false)
+  isPhoneVerified    Boolean              @default(false)
+  deletedAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  sessions           Session[]
+  refreshTokens      RefreshToken[]
+  resetTokens        PasswordResetToken[]
   verificationTokens VerificationToken[]
+  authAuditEvents    AuthAuditEvent[]
+  oauthAccounts      OAuthAccount[]
+  memberships        OrganizationMembership[]
 
   @@unique([organizationId, email])
+  @@unique([organizationId, username])
+  @@unique([organizationId, phone])
+  @@unique([organizationId, studentId])
+  @@unique([organizationId, guardianLinkCode])
+  @@unique([organizationId, employeeId])
   @@index([organizationId])
-  @@index([username])
-  @@index([phone])
+  @@index([organizationId, role, status])
+  @@index([organizationId, deletedAt])
+}
+
+model OrganizationMembership {
+  id             String            @id @default(uuid())
+  organizationId String
+  userId         String
+  role           Role              @default(USER)
+  status         UserAccountStatus @default(ACTIVE)
+  source         String            @default("MANUAL")
+  approvedById   String?
+  approvedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           UserAccount       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, role, status])
+}
+
+model OAuthAccount {
+  id                String      @id @default(uuid())
+  organizationId    String
+  provider          String
+  providerAccountId String
+  email             String
+  userId            String
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([organizationId, email])
+  @@index([userId])
+}
+
+model Session {
+  id            String         @id @default(uuid())
+  userId        String
+  tokenFamilyId String         @unique @default(uuid())
+  deviceName    String?
+  userAgent     String?
+  ipAddress     String?
+  createdAt     DateTime       @default(now())
+  lastUsedAt    DateTime       @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokeReason  String?
+  user          UserAccount    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
 
 model RefreshToken {
-  id             String      @id @default(uuid())
+  id             String        @id @default(uuid())
   organizationId String
   userId         String
-  token          String      @unique
+  sessionId      String
+  familyId       String
+  tokenHash      String        @unique
+  replacedById   String?       @unique
+  usedAt         DateTime?
   expiresAt      DateTime
-  revoked        Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  user           UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revoked        Boolean       @default(false)
+  revokedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  user           UserAccount   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session        Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  replacedBy     RefreshToken? @relation("RefreshTokenReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces       RefreshToken? @relation("RefreshTokenReplacement")
 
   @@index([organizationId])
   @@index([userId])
+  @@index([sessionId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model AuthAuditEvent {
+  id             String             @id @default(uuid())
+  userId         String?
+  organizationId String?
+  eventType      AuthAuditEventType
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  user           UserAccount?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdAt])
 }
 
 model PasswordResetToken {
@@ -77,16 +208,32 @@ enum VerificationType {
 }
 
 model VerificationToken {
-  id             String            @id @default(uuid())
+  id             String           @id @default(uuid())
   organizationId String
   userId         String
   type           VerificationType
-  tokenHash      String            @unique
+  tokenHash      String           @unique
+  attemptCount   Int              @default(0)
+  maxAttempts    Int              @default(5)
   expiresAt      DateTime
   usedAt         DateTime?
-  createdAt      DateTime          @default(now())
-  user           UserAccount       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  user           UserAccount      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([userId])
+  @@index([userId, type, usedAt, expiresAt])
+}
+
+model AuthOutboxEvent {
+  id            String    @id @default(uuid())
+  eventType     String
+  payload       Json
+  createdAt     DateTime  @default(now())
+  publishedAt   DateTime?
+  attemptCount  Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+
+  @@index([publishedAt, nextAttemptAt])
 }

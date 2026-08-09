@@ -21,3 +21,17 @@ export async function closeRedisClient(): Promise<void> {
     redisClient = null;
   }
 }
+
+export async function connectRedis(serviceName: string): Promise<void> {
+  try {
+    await checkRedisReady();
+    console.log(`[${serviceName}] Redis ready`);
+  } catch (error) {
+    // A temporary cache outage must not prevent the HTTP service from serving.
+    console.error(`[${serviceName}] Redis unavailable`, error);
+  }
+}
+
+export async function checkRedisReady(): Promise<void> {
+  await getRedisClient().ping();
+}

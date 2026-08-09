@@ -1,22 +1,20 @@
-export function formatDate(date) {
+import { formatDate as formatLocalizedDate, formatDateTime as formatLocalizedDateTime } from '../i18n';
+
+export function formatRelativeDate(date) {
   const now = new Date();
   const past = new Date(date);
   const diffInSeconds = Math.floor((now - past) / 1000);
 
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  if (diffInSeconds < 60) return 'Дөнгөж сая';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} минутын өмнө`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} цагийн өмнө`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} өдрийн өмнө`;
 
-  return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatLocalizedDate(past);
 }
 
+export const formatDate = formatRelativeDate;
+
 export function formatDateTime(date) {
-  return new Date(date).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatLocalizedDateTime(date);
 }

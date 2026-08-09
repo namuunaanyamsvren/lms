@@ -1,0 +1,4 @@
+CREATE TYPE "QuizScoringPolicy" AS ENUM ('HIGHEST', 'LATEST');
+
+ALTER TABLE "Quiz"
+  ADD COLUMN IF NOT EXISTS "scoringPolicy" "QuizScoringPolicy" NOT NULL DEFAULT 'LATEST';

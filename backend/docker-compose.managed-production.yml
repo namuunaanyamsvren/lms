@@ -1,0 +1,200 @@
+x-app-common: &app-common
+  restart: always
+  read_only: true
+  tmpfs:
+    - /tmp
+  networks:
+    - lms-network
+
+x-service-env: &service-env
+  NODE_ENV: production
+  REQUIRE_INTERNAL_TLS: "true"
+  ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+  SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:?SERVICE_TOKEN_SECRET is required}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
+  REDIS_URL: ${REDIS_URL:?Production rediss:// URL is required}
+  RABBITMQ_URL: ${RABBITMQ_URL:?Production amqps:// URL is required}
+
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+        VITE_TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:?TENANT_BASE_DOMAIN is required}
+        VITE_ENABLE_DEMO_LOGIN: "false"
+    image: lms-frontend:production
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    ports:
+      - "${FRONTEND_HTTP_PORT:-8080}:8080"
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:?API_UPSTREAM is required}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - lms-network
+
+  gateway:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+    image: lms-gateway:production
+    expose:
+      - "8000"
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      REQUIRE_INTERNAL_TLS: "true"
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?ACCESS_TOKEN_SECRET is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:?TENANT_BASE_DOMAIN is required}
+      CSRF_HEADER_NAME: ${CSRF_HEADER_NAME:-x-csrf-token}
+      REDIS_URL: ${REDIS_URL:?Production rediss:// URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?AUTH_SERVICE_URL is required}
+      ORGANIZATION_SERVICE_URL: ${ORGANIZATION_SERVICE_URL:?ORGANIZATION_SERVICE_URL is required}
+      ACADEMIC_SERVICE_URL: ${ACADEMIC_SERVICE_URL:?ACADEMIC_SERVICE_URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?BILLING_SERVICE_URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?NOTIFICATION_SERVICE_URL is required}
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-false}
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      organization-service:
+        condition: service_healthy
+      academic-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+
+  auth-service:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./auth-service/Dockerfile
+    image: lms-auth-service:production
+    expose:
+      - "8001"
+    environment:
+      <<: *service-env
+      PORT: 8001
+      DATABASE_URL: ${AUTH_DATABASE_URL:?AUTH_DATABASE_URL is required}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?REFRESH_TOKEN_SECRET is required}
+      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-7d}
+      REFRESH_COOKIE_NAME: ${REFRESH_COOKIE_NAME:-lms_refresh}
+      REFRESH_COOKIE_PATH: ${REFRESH_COOKIE_PATH:-/api/auth}
+      REFRESH_COOKIE_DOMAIN: ${REFRESH_COOKIE_DOMAIN:-}
+      REFRESH_COOKIE_SAME_SITE: ${REFRESH_COOKIE_SAME_SITE:-lax}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-lms_csrf}
+      CSRF_HEADER_NAME: ${CSRF_HEADER_NAME:-x-csrf-token}
+      CSRF_SECRET: ${CSRF_SECRET:?CSRF_SECRET is required}
+      PHONE_OTP_HASH_SECRET: ${PHONE_OTP_HASH_SECRET:?PHONE_OTP_HASH_SECRET is required}
+      SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
+      SMS_PROVIDER_TIMEOUT_MS: ${SMS_PROVIDER_TIMEOUT_MS:-5000}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?TWILIO_ACCOUNT_SID is required}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?TWILIO_AUTH_TOKEN is required}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:?TWILIO_FROM_NUMBER is required}
+      PASSWORD_COMPROMISED_CHECK_ENABLED: ${PASSWORD_COMPROMISED_CHECK_ENABLED:-true}
+      PASSWORD_COMPROMISED_CHECK_FAILURE_MODE: ${PASSWORD_COMPROMISED_CHECK_FAILURE_MODE:-allow}
+      ORGANIZATION_SERVICE_URL: ${ORGANIZATION_SERVICE_URL:?ORGANIZATION_SERVICE_URL is required}
+      ACADEMIC_SERVICE_URL: ${ACADEMIC_SERVICE_URL:?ACADEMIC_SERVICE_URL is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?GOOGLE_REDIRECT_URI is required}
+
+  organization-service:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./organization-service/Dockerfile
+    image: lms-organization-service:production
+    expose:
+      - "8002"
+    environment:
+      <<: *service-env
+      PORT: 8002
+      DATABASE_URL: ${ORGANIZATION_DATABASE_URL:?ORGANIZATION_DATABASE_URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?AUTH_SERVICE_URL is required}
+      ACADEMIC_SERVICE_URL: ${ACADEMIC_SERVICE_URL:?ACADEMIC_SERVICE_URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?BILLING_SERVICE_URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?NOTIFICATION_SERVICE_URL is required}
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-false}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:?TENANT_BASE_DOMAIN is required}
+
+  academic-service:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./academic-service/Dockerfile
+    image: lms-academic-service:production
+    expose:
+      - "8003"
+    environment:
+      <<: *service-env
+      PORT: 8003
+      DATABASE_URL: ${ACADEMIC_DATABASE_URL:?ACADEMIC_DATABASE_URL is required}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?AUTH_SERVICE_URL is required}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:?BILLING_SERVICE_URL is required}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:?NOTIFICATION_SERVICE_URL is required}
+      FEATURE_BILLING_ENABLED: ${FEATURE_BILLING_ENABLED:-false}
+      FILE_SIGNING_SECRET: ${FILE_SIGNING_SECRET:?FILE_SIGNING_SECRET is required}
+      FILE_DOWNLOAD_BASE_URL: ${FILE_DOWNLOAD_BASE_URL:?FILE_DOWNLOAD_BASE_URL is required}
+      FILE_STORAGE_DIRECTORY: ${FILE_STORAGE_DIRECTORY:-/data/private-uploads}
+      FILE_STORAGE_AT_REST_ENCRYPTED: "true"
+      MALWARE_SCAN_MODE: required
+      MALWARE_SCANNER_URL: ${MALWARE_SCANNER_URL:?MALWARE_SCANNER_URL is required}
+    volumes:
+      - academic_uploads:/data/private-uploads
+
+  billing-service:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./billing-service/Dockerfile
+    image: lms-billing-service:production
+    expose:
+      - "8004"
+    environment:
+      <<: *service-env
+      PORT: 8004
+      DATABASE_URL: ${BILLING_DATABASE_URL:?BILLING_DATABASE_URL is required}
+
+  notification-service:
+    <<: *app-common
+    build:
+      context: .
+      dockerfile: ./notification-service/Dockerfile
+    image: lms-notification-service:production
+    expose:
+      - "8005"
+    environment:
+      <<: *service-env
+      PORT: 8005
+      DATABASE_URL: ${NOTIFICATION_DATABASE_URL:?NOTIFICATION_DATABASE_URL is required}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?SMTP_USER is required}
+      SMTP_PASS: ${SMTP_PASS:?SMTP_PASS is required}
+      SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is required}
+      WEB_PUSH_PROVIDER_URL: ${WEB_PUSH_PROVIDER_URL:?WEB_PUSH_PROVIDER_URL is required}
+      WEB_PUSH_PROVIDER_TOKEN: ${WEB_PUSH_PROVIDER_TOKEN:?WEB_PUSH_PROVIDER_TOKEN is required}
+
+volumes:
+  academic_uploads:
+
+networks:
+  lms-network:
+    driver: bridge

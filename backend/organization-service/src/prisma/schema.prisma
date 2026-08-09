@@ -5,35 +5,55 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-organization"
 }
 
 enum OrgStatus {
   ACTIVE
   SUSPENDED
+  ARCHIVED
   CANCELLED
 }
 
 model Organization {
-  id          String         @id @default(uuid())
-  name        String
-  slug        String         @unique
-  domain      String?
-  logoUrl     String?
-  status      OrgStatus      @default(ACTIVE)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  settings    OrgSettings?
+  id        String       @id @default(uuid())
+  name      String
+  slug      String       @unique
+  domain    String?      @unique
+  domainVerifiedAt DateTime?
+  domainVerificationToken String? @unique
+  logoUrl   String?
+  faviconUrl String?
+  status    OrgStatus    @default(ACTIVE)
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  settings  OrgSettings?
+
+  @@index([status, deletedAt])
 }
 
 model OrgSettings {
-  id             String       @id @default(uuid())
-  organizationId String       @unique
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  primaryColor   String?      @default("#3B82F6")
-  allowRegister  Boolean      @default(true)
-  maxUsers       Int          @default(100)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                       String       @id @default(uuid())
+  organizationId           String       @unique
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  primaryColor             String?      @default("#3B82F6")
+  emailFromName            String?
+  academicYear             String?
+  semester                 String?
+  timezone                 String       @default("Asia/Ulaanbaatar")
+  locale                   String       @default("mn-MN")
+  gradingScaleJson         String?
+  attendanceRuleJson       String?
+  passwordPolicyJson       String?
+  allowRegister            Boolean      @default(true)
+  invitationCodeHash       String?
+  allowedEmailDomains      String[]     @default([])
+  requireEmailVerification Boolean      @default(false)
+  requirePhoneVerification Boolean      @default(false)
+  maxUsers                 Int          @default(100)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
 
   @@index([organizationId])
 }

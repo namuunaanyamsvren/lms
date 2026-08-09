@@ -3,6 +3,9 @@ dotenv.config();
 
 export const config = {
   port: process.env.PORT || 8000,
+  features: {
+    billing: process.env.FEATURE_BILLING_ENABLED === 'true',
+  },
   services: {
     auth: process.env.AUTH_SERVICE_URL || 'http://localhost:8001',
     organization: process.env.ORGANIZATION_SERVICE_URL || 'http://localhost:8002',

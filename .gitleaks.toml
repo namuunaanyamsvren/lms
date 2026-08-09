@@ -1,0 +1,11 @@
+title = "LMS secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Empty provider token placeholders in committed .env.example files"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)\.env\.example$''']
+regexes = ['''(?m)^[A-Z0-9_]*PROVIDER_TOKEN=""$''']

@@ -1,0 +1,45 @@
+name: PostgreSQL restore drill
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '31 3 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: restore-drill-password
+      RABBITMQ_USER: restore
+      RABBITMQ_PASSWORD: restore-drill-password
+      ACCESS_TOKEN_SECRET: restore-drill-access-secret-with-at-least-forty-three-characters
+      REFRESH_TOKEN_SECRET: restore-drill-refresh-secret-with-at-least-forty-three-characters
+      SERVICE_TOKEN_SECRET: restore-drill-service-secret-with-at-least-forty-three-characters
+      CSRF_SECRET: restore-drill-csrf-secret-with-at-least-forty-three-characters
+      PHONE_OTP_HASH_SECRET: restore-drill-phone-secret-with-at-least-forty-three-characters
+      GOOGLE_CLIENT_ID: restore-drill.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: restore-drill-secret
+      GOOGLE_REDIRECT_URI: http://localhost:5173/auth/callback
+    steps:
+      - uses: actions/checkout@v6
+      - name: Start WAL-archiving PostgreSQL
+        run: docker compose -f docker-compose.yml -f docker-compose.development.yml up -d --build postgres
+      - name: Create and verify physical base backup
+        run: docker compose -f docker-compose.yml -f docker-compose.development.yml run --rm --entrypoint /usr/local/bin/backup-once.sh postgres-backup
+      - name: Restore and start isolated PITR cluster
+        run: docker compose -f docker-compose.yml -f docker-compose.development.yml run --rm postgres-restore-drill
+      - name: Capture PostgreSQL logs
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.development.yml logs postgres
+      - name: Remove ephemeral drill volumes
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.development.yml down --volumes

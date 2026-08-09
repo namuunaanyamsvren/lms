@@ -4,12 +4,12 @@ import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import { Bell, ClipboardList, BarChart2, Users, Star } from 'lucide-react';
 import { getStaffDashboardData } from '../../services/api';
+import CalendarWithNotes from '../../components/dashboard/CalendarWithNotes';
 
 const STAT_ICONS = {
-  Documents: ClipboardList,
-  Scholarships: Star,
-  Announcements: Bell,
-  Reports: BarChart2,
+  documents: ClipboardList,
+  scholarships: Star,
+  reports: BarChart2,
 };
 
 export default function Staff() {
@@ -41,34 +41,35 @@ export default function Staff() {
   if (error) {
     return <div className="space-y-6">{error}</div>;
   }
+  const visibleStats = dashboardData.stats.filter((item) => item.key !== 'announcements');
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Staff Dashboard"
-        subtitle="Manage student docs, scholarships, announcements, and quick staff metrics."
+        title="Ажилтны хянах самбар"
+        subtitle="Сурагчдын бичиг баримт, тэтгэлэг болон үзүүлэлтийг удирдах."
         right={<>
-          <div className="font-medium text-slate-900">Today</div>
-          <div className="mt-1">{new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+          <div className="font-medium text-slate-900">Өнөөдөр</div>
+          <div className="mt-1">{new Date().toLocaleDateString('mn-MN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
         </>}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {dashboardData.stats.map((item, index) => (
+        {visibleStats.map((item, index) => (
           <StatCard
             key={index}
             title={item.label}
             value={item.value}
-            icon={STAT_ICONS[item.label]}
+            icon={STAT_ICONS[item.key]}
           />
         ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="space-y-6 xl:col-span-2">
-          <Card title="Pending Documents" id="student-documents">
+          <Card title="Хүлээгдэж буй бичиг баримт" id="student-documents">
             {dashboardData.pendingDocuments.length === 0 ? (
-              <p className="text-sm text-slate-500">No pending documents right now.</p>
+              <p className="text-sm text-slate-500">Хүлээгдэж буй бичиг баримт алга.</p>
             ) : (
               <div className="space-y-3">
                 {dashboardData.pendingDocuments.map((doc, index) => (
@@ -86,9 +87,9 @@ export default function Staff() {
             )}
           </Card>
 
-          <Card title="Scholarship Requests" id="scholarship-management">
+          <Card title="Тэтгэлгийн хүсэлтүүд" id="scholarship-management">
             {dashboardData.scholarshipRequests.length === 0 ? (
-              <p className="text-sm text-slate-500">No scholarship requests right now.</p>
+              <p className="text-sm text-slate-500">Тэтгэлгийн хүсэлт алга.</p>
             ) : (
               <div className="space-y-3">
                 {dashboardData.scholarshipRequests.map((request, index) => (
@@ -106,28 +107,14 @@ export default function Staff() {
             )}
           </Card>
 
-          <Card title="Recent Announcements" id="announcements">
-            {dashboardData.announcements.length === 0 ? (
-              <p className="text-sm text-slate-500">No announcements yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {dashboardData.announcements.map((item, index) => (
-                  <div key={index} className="rounded-3xl bg-slate-50 p-4 border border-slate-200">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium text-slate-900">{item.title}</p>
-                      <span className="text-xs text-slate-500">{item.time}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
         </div>
 
         <div className="space-y-6">
-          <Card title="Recent Activities" id="reports">
+          <CalendarWithNotes />
+
+          <Card title="Сүүлийн үйл ажиллагаа" id="reports">
             {dashboardData.recentActivities.length === 0 ? (
-              <p className="text-sm text-slate-500">No recent activity yet.</p>
+              <p className="text-sm text-slate-500">Сүүлийн үйл ажиллагаа алга.</p>
             ) : (
               <ul className="space-y-3 text-sm text-slate-600">
                 {dashboardData.recentActivities.map((activity, index) => (
@@ -137,18 +124,18 @@ export default function Staff() {
             )}
           </Card>
 
-          <Card title="Quick Statistics" id="notifications">
+          <Card title="Товч статистик" id="notifications">
             <div className="space-y-4">
               <div className="flex items-center justify-between rounded-3xl bg-slate-50 p-4 border border-slate-200">
                 <div>
-                  <p className="text-sm text-slate-500">Open Applications</p>
+                  <p className="text-sm text-slate-500">Нээлттэй хүсэлт</p>
                   <p className="text-xl font-semibold text-slate-900">{dashboardData.quickStats.openApplications}</p>
                 </div>
                 <Users size={22} className="text-sky-600" />
               </div>
               <div className="flex items-center justify-between rounded-3xl bg-slate-50 p-4 border border-slate-200">
                 <div>
-                  <p className="text-sm text-slate-500">Today's Notices</p>
+                  <p className="text-sm text-slate-500">Өнөөдрийн мэдэгдэл</p>
                   <p className="text-xl font-semibold text-slate-900">{dashboardData.quickStats.todaysNotices}</p>
                 </div>
                 <Bell size={22} className="text-amber-600" />

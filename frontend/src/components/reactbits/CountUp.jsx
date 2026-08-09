@@ -33,23 +33,14 @@ export default function CountUp({
   );
 
   useEffect(() => {
-    if (ref.current) {
-      if (startWhenInView && isInView) {
-        startAnimation();
-      } else if (!startWhenInView) {
-        startAnimation();
-      }
-    }
-  }, [isInView, startWhenInView]);
-
-  const startAnimation = () => {
+    if (!ref.current || (startWhenInView && !isInView)) return undefined;
     if (onStart) onStart();
     const timeoutId = setTimeout(() => {
       motionValue.set(direction === 'down' ? from : to);
     }, delay * 1000);
 
     return () => clearTimeout(timeoutId);
-  };
+  }, [delay, direction, from, isInView, motionValue, onStart, startWhenInView, to]);
 
   useEffect(() => {
     const unsubscribe = springValue.on('change', (latest) => {
