@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { buildGoogleLoginUrl } from '../../services/googleOAuth';
-import { resolveTenant } from '../../services/tenantResolution';
+import { inferredTenantKey, normalizeTenantKey, resolveTenant } from '../../services/tenantResolution';
 
 const demoAccounts = [
   { label: 'Менежер', email: 'admin@lms.mn' },
@@ -14,8 +14,14 @@ const demoPassword = 'password123';
 const demoTenant = 'mongol-erdem';
 const demoLoginEnabled = import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
+export const resolveLoginTenantKey = locationState => {
+  const stateTenant = normalizeTenantKey(locationState?.tenantSlug);
+  return stateTenant || inferredTenantKey() || demoTenant;
+};
+
 export default function Login() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { login, loading, error: authError } = useAuth();
   const [identifier, setIdentifier] = useState('');
@@ -26,7 +32,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError(null);
-    try{const tenant=await resolveTenant(demoTenant);
+    try{const tenant=await resolveTenant(resolveLoginTenantKey(location.state));
       const result = await login({organizationId:tenant.id,identifier:identifier.trim(),password});
       if (result.success) navigate(result.redirectPath, { replace: true });
     }catch(error){setLocalError(error.message||'Байгууллагыг тодорхойлж чадсангүй.');}
@@ -35,7 +41,9 @@ export default function Login() {
   const handleGoogleLogin = () => {
     try {
       setLocalError(null);
-      resolveTenant(demoTenant).then(tenant=>window.location.assign(buildGoogleLoginUrl(tenant.id))).catch(error=>setLocalError(error.message));
+      resolveTenant(resolveLoginTenantKey(location.state))
+        .then(tenant=>window.location.assign(buildGoogleLoginUrl(tenant.id)))
+        .catch(error=>setLocalError(error.message));
     } catch (error) {
       setLocalError(error.message);
     }
