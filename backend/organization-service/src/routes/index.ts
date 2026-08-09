@@ -5,6 +5,7 @@ import {
   AppError,
   asyncHandler,
   authMiddleware,
+  createPrincipalRateLimiter,
   idempotencyMiddleware,
   requireRole,
   tenantMiddleware,
@@ -86,10 +87,10 @@ const onboardingLimiter = rateLimit({
 router.post('/onboard', onboardingLimiter, idempotencyMiddleware('organization-onboard'), validateBody(onboardingSchema), asyncHandler(onboard));
 router.get('/resolve', asyncHandler(resolveTenant));
 router.get('/public', asyncHandler(publicList));
-router.get('/platform/dashboard', authMiddleware, requireRole('SUPER_ADMIN'), asyncHandler(platformDashboard));
-router.get('/platform', authMiddleware, requireRole('SUPER_ADMIN'), asyncHandler(platformList));
-router.patch('/platform/:id/status', authMiddleware, requireRole('SUPER_ADMIN'), validateBody(z.object({status:z.enum(['ACTIVE','SUSPENDED','ARCHIVED'])}).strict()), asyncHandler(platformLifecycle));
-router.use(authMiddleware, tenantMiddleware);
+router.get('/platform/dashboard', authMiddleware, createPrincipalRateLimiter(), requireRole('SUPER_ADMIN'), asyncHandler(platformDashboard));
+router.get('/platform', authMiddleware, createPrincipalRateLimiter(), requireRole('SUPER_ADMIN'), asyncHandler(platformList));
+router.patch('/platform/:id/status', authMiddleware, createPrincipalRateLimiter(), requireRole('SUPER_ADMIN'), validateBody(z.object({status:z.enum(['ACTIVE','SUSPENDED','ARCHIVED'])}).strict()), asyncHandler(platformLifecycle));
+router.use(authMiddleware, tenantMiddleware, createPrincipalRateLimiter());
 router.get('/current', asyncHandler(getCurrentOrganization));
 router.put('/current', requireRole('ORG_ADMIN', 'SUPER_ADMIN'), validateBody(brandingSchema.partial()), asyncHandler(updateCurrentOrganization));
 router.put('/current/settings', requireRole('ORG_ADMIN', 'SUPER_ADMIN'), validateBody(settingsSchema), asyncHandler(updateSettings));

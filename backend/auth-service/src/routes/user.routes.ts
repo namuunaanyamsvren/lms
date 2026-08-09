@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { AppError, asyncHandler, authMiddleware, requireRole, tenantMiddleware } from '@lms/shared';
+import { AppError, asyncHandler, authMiddleware, createPrincipalRateLimiter, requireRole, tenantMiddleware } from '@lms/shared';
 import {
   createUser,
   deactivateUser,
@@ -19,7 +19,7 @@ const router = Router();
 const readRoles = requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'PRINCIPAL', 'STAFF');
 const writeRoles = requireRole('SUPER_ADMIN', 'ORG_ADMIN');
 
-router.use(authMiddleware, tenantMiddleware);
+router.use(authMiddleware, tenantMiddleware, createPrincipalRateLimiter());
 router.get('/', readRoles, asyncHandler(getUsers));
 router.post('/', writeRoles, asyncHandler(createUser));
 router.get('/export', readRoles, asyncHandler(exportUsers));

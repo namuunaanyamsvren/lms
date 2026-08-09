@@ -17,6 +17,9 @@ type ConsumerOptions = {
   retryBaseMs?: number;
   inbox?: ConsumerInbox;
 };
+const safeEventLabel = (value: string | undefined) =>
+  value ? value.replace(/[^A-Z0-9_.:-]/gi, '_').slice(0, 120) : undefined;
+
 export async function subscribeToEvent(
   exchange: string,
   queue: string,
@@ -146,7 +149,7 @@ export async function subscribeToEvent(
             level: 'error',
             kind: poison ? 'poison_event' : 'event_handler_failure',
             queue,
-            routingKey,
+            routingKey: safeEventLabel(routingKey),
             eventId: envelope?.eventId,
             retries,
             error: message,

@@ -92,13 +92,15 @@ export const checkCompromisedPassword = async (
 ): Promise<boolean> => {
   if (!isCompromisedCheckEnabled(options.compromisedCheckEnabled)) return false;
 
-  const digest = crypto
+  // The Have I Been Pwned k-anonymity API requires SHA-1 prefix lookup.
+  // This digest is never used for password storage or authentication.
+  const pwnedRangeDigest = crypto
     .createHash('sha1')
     .update(password, 'utf8')
     .digest('hex')
     .toUpperCase();
-  const prefix = digest.slice(0, 5);
-  const suffix = digest.slice(5);
+  const prefix = pwnedRangeDigest.slice(0, 5);
+  const suffix = pwnedRangeDigest.slice(5);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 

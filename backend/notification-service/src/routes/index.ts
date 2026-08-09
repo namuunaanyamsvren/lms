@@ -47,7 +47,7 @@ router.post('/provider-webhooks/:provider',providerWebhookLimiter,(req,_res,next
  if(!result.success)return next(AppError.badRequest('Invalid provider webhook'));req.body=result.data;next();
 },asyncHandler(providerWebhook));
 
-router.use(authMiddleware, tenantMiddleware);
+router.use(authMiddleware, tenantMiddleware, createPrincipalRateLimiter());
 router.get('/unread-count',asyncHandler(getUnreadCount));
 router.get('/preferences',asyncHandler(getPreferences));
 router.put('/preferences',(req,_res,next)=>{const result=z.object({digestMode:z.enum(['IMMEDIATE','DAILY','WEEKLY','NONE']).optional(),timezone:z.string().max(100).optional(),emailEnabled:z.boolean().optional(),inAppEnabled:z.boolean().optional(),pushEnabled:z.boolean().optional(),smsEnabled:z.boolean().optional(),quietHoursStart:z.string().regex(/^\d\d:\d\d$/).optional().nullable(),quietHoursEnd:z.string().regex(/^\d\d:\d\d$/).optional().nullable(),events:z.array(z.object({eventType:z.string().min(1).max(100),email:z.boolean().optional(),inApp:z.boolean().optional(),push:z.boolean().optional(),sms:z.boolean().optional()}).strict()).max(100).optional()}).strict().safeParse(req.body);if(!result.success)return next(AppError.badRequest('Invalid preferences',result.error.flatten()));req.body=result.data;next();},asyncHandler(updatePreferences));

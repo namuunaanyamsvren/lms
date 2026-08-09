@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncHandler, authMiddleware, idempotencyMiddleware, requireRole, tenantMiddleware } from '@lms/shared';
+import { asyncHandler, authMiddleware, createPrincipalRateLimiter, idempotencyMiddleware, requireRole, tenantMiddleware } from '@lms/shared';
 import {
   createQPayInvoice,
   failInvoice,
@@ -15,7 +15,7 @@ import {
 } from '../controllers/billing.controller';
 
 const router = Router();
-router.use(authMiddleware, tenantMiddleware);
+router.use(authMiddleware, tenantMiddleware, createPrincipalRateLimiter());
 router.get('/', asyncHandler(getBillingOverview));
 router.get('/invoices', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), asyncHandler(listInvoices));
 router.get('/outstanding', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), asyncHandler(listOutstandingInvoices));

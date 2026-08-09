@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncHandler, authMiddleware, idempotencyMiddleware, tenantMiddleware, requireRole } from '@lms/shared';
+import { asyncHandler, authMiddleware, createPrincipalRateLimiter, idempotencyMiddleware, tenantMiddleware, requireRole } from '@lms/shared';
 import { z } from 'zod';
 import { validate } from '../middlewares/validate';
 import {
@@ -130,7 +130,6 @@ import {
 import { downloadFile, inspectFile, signFile } from '../controllers/upload.controller';
 import express from 'express';
 import * as certificateController from '../controllers/certificate.controller';
-import { createPrincipalRateLimiter } from '@lms/shared';
 
 const router = Router();
 const entityId = z.string().trim().min(1).max(200);
@@ -269,7 +268,7 @@ router.get(
 );
 
 // Everything below requires a valid JWT; tenantMiddleware resolves the real organizationId from it.
-router.use(authMiddleware, tenantMiddleware);
+router.use(authMiddleware, tenantMiddleware, createPrincipalRateLimiter());
 
 // Binary data is persisted only after extension, declared MIME, magic-byte and
 // malware checks.

@@ -31,6 +31,11 @@ const resolveStoragePath = (fileKey: string) => {
   return target;
 };
 
+const scalarQuery = (value: unknown): string => {
+  if (typeof value !== 'string') throw AppError.badRequest('Invalid signed file URL');
+  return value;
+};
+
 export const inspectFile = async (req: Request, res: Response) => {
   if (!Buffer.isBuffer(req.body)) throw AppError.badRequest('Upload must contain a binary body');
   const filename = req.header('x-file-name') || '';
@@ -108,10 +113,10 @@ export const signFile = async (req: Request, res: Response) => {
 };
 
 export const downloadFile = async (req: Request, res: Response) => {
-  const organizationId = String(req.query.organizationId || '');
-  const fileKey = String(req.query.key || '');
-  const expiresAt = Number(req.query.expires);
-  const signature = String(req.query.signature || '');
+  const organizationId = scalarQuery(req.query.organizationId);
+  const fileKey = scalarQuery(req.query.key);
+  const expiresAt = Number(scalarQuery(req.query.expires));
+  const signature = scalarQuery(req.query.signature);
   if (!verifySignedFileRequest({
     organizationId,
     fileKey,

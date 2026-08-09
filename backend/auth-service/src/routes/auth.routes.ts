@@ -5,6 +5,7 @@ import {
   asyncHandler,
   authMiddleware,
   csrfProtection,
+  createPrincipalRateLimiter,
   issueCsrfToken,
   requireRole,
   tenantMiddleware,
@@ -50,6 +51,7 @@ const registrationLimiter = publicMutationLimiter(10);
 const loginLimiter = publicMutationLimiter(30);
 const recoveryLimiter = publicMutationLimiter(10);
 const oauthLimiter = publicMutationLimiter(30);
+const principalLimiter = createPrincipalRateLimiter();
 
 router.get('/csrf-token', issueCsrfToken);
 router.use(csrfProtection);
@@ -59,26 +61,28 @@ router.post('/google/exchange', oauthLimiter, asyncHandler(exchangeGoogleLoginCo
 router.post('/register', registrationLimiter, register);
 router.post('/login', loginLimiter, login);
 router.post('/refresh', refresh);
-router.post('/switch-organization', authMiddleware, asyncHandler(switchOrganization));
+router.post('/switch-organization', authMiddleware, principalLimiter, asyncHandler(switchOrganization));
 router.post('/logout', logout);
 router.post('/forgot-password', recoveryLimiter, forgotPassword);
 router.post('/reset-password', recoveryLimiter, resetPassword);
-router.post('/change-password', authMiddleware, asyncHandler(changePassword));
-router.post('/send-verification', authMiddleware, sendVerification);
-router.post('/send-phone-verification', authMiddleware, sendPhoneVerification);
-router.post('/verify-phone', authMiddleware, verifyPhone);
+router.post('/change-password', authMiddleware, principalLimiter, asyncHandler(changePassword));
+router.post('/send-verification', authMiddleware, principalLimiter, sendVerification);
+router.post('/send-phone-verification', authMiddleware, principalLimiter, sendPhoneVerification);
+router.post('/verify-phone', authMiddleware, principalLimiter, verifyPhone);
 router.post('/verify', verifyAccount);
-router.get('/me', authMiddleware, getMe);
+router.get('/me', authMiddleware, principalLimiter, getMe);
 router.get(
   '/privacy/export',
   authMiddleware,
   tenantMiddleware,
+  principalLimiter,
   asyncHandler(exportMyData),
 );
 router.delete(
   '/privacy/account',
   authMiddleware,
   tenantMiddleware,
+  principalLimiter,
   (req, _res, next) => {
     const result = z.object({ confirmation: z.literal('DELETE') }).strict().safeParse(req.body);
     if (!result.success) return next(AppError.badRequest('Type DELETE to confirm account deletion'));
@@ -87,18 +91,20 @@ router.delete(
   },
   asyncHandler(anonymizeMyAccount),
 );
-router.post('/logout-all', authMiddleware, asyncHandler(logoutAll));
-router.get('/sessions', authMiddleware, asyncHandler(getActiveSessions));
+router.post('/logout-all', authMiddleware, principalLimiter, asyncHandler(logoutAll));
+router.get('/sessions', authMiddleware, principalLimiter, asyncHandler(getActiveSessions));
 router.get(
   '/audit-events',
   authMiddleware,
   tenantMiddleware,
+  principalLimiter,
   requireRole('SUPER_ADMIN', 'ORG_ADMIN'),
   asyncHandler(getOrganizationAuthAuditEvents),
 );
 router.delete(
   '/sessions/:id',
   authMiddleware,
+  principalLimiter,
   (req, _res, next) => {
     const result = z.string().uuid().safeParse(req.params.id);
     if (!result.success) return next(AppError.badRequest('Invalid session id'));

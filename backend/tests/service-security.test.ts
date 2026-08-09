@@ -3,6 +3,7 @@ import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createServiceToken,
+  applyHttpSecurity,
   internalServiceAuth,
   requireInternalService,
   validateServiceEnvironment,
@@ -15,6 +16,7 @@ describe('service authentication', () => {
     vi.stubEnv('SERVICE_TOKEN_SECRET', 's'.repeat(43));
     vi.stubEnv('ACCESS_TOKEN_SECRET', 'a'.repeat(43));
     const app = express();
+    applyHttpSecurity(app);
     app.get(
       '/internal',
       internalServiceAuth,

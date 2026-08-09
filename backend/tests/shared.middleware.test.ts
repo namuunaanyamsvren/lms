@@ -13,6 +13,7 @@ import {
 describe('shared HTTP middleware', () => {
   it('authenticates and scopes the tenant from the verified token', async () => {
     const app = express();
+    applyHttpSecurity(app);
     app.get('/private', authMiddleware, tenantMiddleware, (req, res) => {
       res.json({ userId: req.user?.userId, organizationId: req.organizationId });
     });
@@ -34,6 +35,7 @@ describe('shared HTTP middleware', () => {
 
   it('rejects a protected request without a token', async () => {
     const app = express();
+    applyHttpSecurity(app);
     app.get('/private', authMiddleware, (_req, res) => res.sendStatus(204));
     app.use(errorHandler);
     const response = await request(app).get('/private');
@@ -43,6 +45,7 @@ describe('shared HTTP middleware', () => {
 
   it('blocks vertical privilege escalation from a student token', async () => {
     const app = express();
+    applyHttpSecurity(app);
     app.post(
       '/admin-only',
       authMiddleware,

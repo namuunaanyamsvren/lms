@@ -16,6 +16,21 @@ const publicBase = (process.env.PUBLIC_APP_URL || 'http://localhost:5173').repla
 const safeName = (value: string) => value.replace(/[\r\n]/g, ' ').slice(0, 200);
 
 const createCode = () => crypto.randomBytes(9).toString('base64url').toUpperCase();
+const privateHostnamePattern = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.0\.0\.0)/i;
+
+const safeRemoteImageUrl = (value: string): string | null => {
+  try {
+    const url = new URL(value);
+    if (!['https:', 'http:'].includes(url.protocol)) return null;
+    if (privateHostnamePattern.test(url.hostname)) return null;
+    url.username = '';
+    url.password = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return null;
+  }
+};
 
 // Admin-supplied CertificateTemplate.logoUrl is an arbitrary URL, so this is
 // fetched with a timeout, an image-content-type check, and a size cap —
@@ -24,7 +39,9 @@ const createCode = () => crypto.randomBytes(9).toString('base64url').toUpperCase
 const fetchLogoBuffer = async (logoUrl?: string | null): Promise<Buffer | null> => {
   if (!logoUrl) return null;
   try {
-    const response = await fetch(logoUrl, { signal: AbortSignal.timeout(5000) });
+    const safeLogoUrl = safeRemoteImageUrl(logoUrl);
+    if (!safeLogoUrl) return null;
+    const response = await fetch(safeLogoUrl, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) return null;
     if (!(response.headers.get('content-type') || '').startsWith('image/')) return null;
     const bytes = await response.arrayBuffer();

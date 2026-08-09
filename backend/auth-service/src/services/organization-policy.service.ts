@@ -15,8 +15,13 @@ export const getOrganizationAuthPolicy = async (
   organizationId: string,
 ): Promise<OrganizationAuthPolicy> => {
   const baseUrl = process.env.ORGANIZATION_SERVICE_URL || 'http://localhost:8002';
+  const base = new URL(baseUrl);
+  if (!['http:', 'https:'].includes(base.protocol)) {
+    throw AppError.internal('ORGANIZATION_SERVICE_URL is invalid');
+  }
+  const safeOrganizationId = encodeURIComponent(organizationId);
   const response = await fetch(
-    `${baseUrl}/internal/organizations/${organizationId}/registration-policy`,
+    new URL(`/internal/organizations/${safeOrganizationId}/registration-policy`, base).toString(),
     { headers: serviceAuthorizationHeaders('auth-service') },
   );
   if (!response.ok) {

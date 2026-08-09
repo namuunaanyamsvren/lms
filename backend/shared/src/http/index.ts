@@ -22,7 +22,16 @@ function sleep(ms: number): Promise<void> {
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, '');
+  const parsed = new URL(baseUrl);
+  parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+  parsed.search = '';
+  parsed.hash = '';
+  return parsed.toString().replace(/\/$/, '');
+}
+
+function joinServiceUrl(baseUrl: string, requestPath: string): string {
+  const path = requestPath.startsWith('/') ? requestPath : `/${requestPath}`;
+  return `${baseUrl}${path}`;
 }
 
 export function createServiceHttpClient(options: ServiceHttpClientOptions) {
@@ -44,7 +53,7 @@ export function createServiceHttpClient(options: ServiceHttpClientOptions) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, {
+        const response = await fetch(joinServiceUrl(baseUrl, path), {
           ...init,
           headers: { ...options.defaultHeaders, ...init.headers },
           signal: init.signal || controller.signal,
