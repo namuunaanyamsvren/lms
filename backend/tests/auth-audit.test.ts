@@ -96,7 +96,7 @@ describe('central authentication audit service', () => {
       organizationId: 'org-1',
     })).resolves.toBe(false);
     expect(log).toHaveBeenCalledWith(
-      '[AuthAudit] best-effort write failed for LOGIN_FAILURE',
+      '[AuthAudit] best-effort write failed',
     );
 
     await expect(recordAuthAudit(failing.client, {
