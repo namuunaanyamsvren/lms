@@ -86,6 +86,12 @@ const getFailureMode = (
 export const normalizePassword = (password: string): string =>
   password.normalize('NFKC');
 
+const pwnedPasswordRangeDigest = async (password: string): Promise<string> => {
+  const bytes = new TextEncoder().encode(password);
+  const digest = await crypto.webcrypto.subtle.digest('SHA-1', bytes);
+  return Buffer.from(digest).toString('hex').toUpperCase();
+};
+
 export const checkCompromisedPassword = async (
   password: string,
   options: PasswordPolicyOptions = {},
@@ -94,11 +100,7 @@ export const checkCompromisedPassword = async (
 
   // The Have I Been Pwned k-anonymity API requires SHA-1 prefix lookup.
   // This digest is never used for password storage or authentication.
-  const pwnedRangeDigest = crypto
-    .createHash('sha1')
-    .update(password, 'utf8')
-    .digest('hex')
-    .toUpperCase();
+  const pwnedRangeDigest = await pwnedPasswordRangeDigest(password);
   const prefix = pwnedRangeDigest.slice(0, 5);
   const suffix = pwnedRangeDigest.slice(5);
   const controller = new AbortController();

@@ -15,14 +15,19 @@ const positiveInteger = (name: string, fallback: number): number => {
 export const createPasswordResetToken = (): string =>
   crypto.randomBytes(TOKEN_BYTES).toString('base64url');
 
-const resetTokenMacSecret = (): string =>
+const resetTokenKdfSecret = (): string =>
   process.env.PASSWORD_RESET_TOKEN_HASH_SECRET ||
   process.env.SERVICE_TOKEN_SECRET ||
   process.env.REFRESH_TOKEN_SECRET ||
-  'test-only-password-reset-token-hmac-secret';
+  'test-only-password-reset-token-kdf-secret';
 
 export const hashPasswordResetToken = (token: string): string =>
-  crypto.createHmac('sha256', resetTokenMacSecret()).update(token, 'utf8').digest('hex');
+  crypto.scryptSync(token, resetTokenKdfSecret(), 32, {
+    N: 16_384,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  }).toString('hex');
 
 export const getPasswordResetExpiresInMs = (): number =>
   parseDuration(

@@ -61,9 +61,6 @@ export const getAuthAuditSeverity = (
 ): AuthAuditSeverity =>
   BEST_EFFORT_EVENTS.has(eventType) ? 'best-effort' : 'critical';
 
-const safeAuditEventLabel = (eventType: AuthAuditEventType): string =>
-  eventType.replace(/[^A-Z0-9_]/g, '_').slice(0, 80);
-
 export const recordAuthAudit = async (
   writer: AuthAuditWriter,
   input: AuthAuditInput,
@@ -97,11 +94,11 @@ export const recordAuthAudit = async (
       // Do not attach the database error as a cause: downstream error
       // serialization must not expose query or connection details.
       // eslint-disable-next-line preserve-caught-error
-      throw new Error(`Critical authentication audit write failed for ${safeAuditEventLabel(input.eventType)}`);
+      throw new Error('Critical authentication audit write failed');
     }
     // Never log the original database error or input: either could contain
     // sensitive query context. Best-effort events must not alter auth results.
-    console.error(`[AuthAudit] best-effort write failed for ${safeAuditEventLabel(input.eventType)}`);
+    console.error('[AuthAudit] best-effort write failed');
     return false;
   }
 };

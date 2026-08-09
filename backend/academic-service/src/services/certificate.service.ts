@@ -16,40 +16,13 @@ const publicBase = (process.env.PUBLIC_APP_URL || 'http://localhost:5173').repla
 const safeName = (value: string) => value.replace(/[\r\n]/g, ' ').slice(0, 200);
 
 const createCode = () => crypto.randomBytes(9).toString('base64url').toUpperCase();
-const privateHostnamePattern = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.0\.0\.0)/i;
-
-const safeRemoteImageUrl = (value: string): string | null => {
-  try {
-    const url = new URL(value);
-    if (!['https:', 'http:'].includes(url.protocol)) return null;
-    if (privateHostnamePattern.test(url.hostname)) return null;
-    url.username = '';
-    url.password = '';
-    url.hash = '';
-    return url.toString();
-  } catch {
-    return null;
-  }
-};
 
 // Admin-supplied CertificateTemplate.logoUrl is an arbitrary URL, so this is
-// fetched with a timeout, an image-content-type check, and a size cap —
-// a broken/unreachable/oversized logo must degrade to "no logo", never fail
-// certificate issuance or leak a hanging request.
+// intentionally not fetched by the backend. Certificate issuance must not make
+// outbound requests to tenant-controlled URLs.
 const fetchLogoBuffer = async (logoUrl?: string | null): Promise<Buffer | null> => {
   if (!logoUrl) return null;
-  try {
-    const safeLogoUrl = safeRemoteImageUrl(logoUrl);
-    if (!safeLogoUrl) return null;
-    const response = await fetch(safeLogoUrl, { signal: AbortSignal.timeout(5000) });
-    if (!response.ok) return null;
-    if (!(response.headers.get('content-type') || '').startsWith('image/')) return null;
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength > 5 * 1024 * 1024) return null;
-    return Buffer.from(bytes);
-  } catch {
-    return null;
-  }
+  return null;
 };
 
 async function renderPdf(input: { title: string; issuer: string; recipient: string; course: string; code: string; issuedAt: Date; accent: string; signature?: string | null; logo?: Buffer | null }) {

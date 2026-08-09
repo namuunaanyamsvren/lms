@@ -24,11 +24,6 @@ import { prisma } from '../lib/prisma';
 const queryString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
 
-const providerDeniedAccess = (value: unknown): boolean => {
-  const error = queryString(value);
-  return error === 'access_denied' || error === 'interaction_required';
-};
-
 const redirectWithError = (res: Response, error: string) =>
   res.redirect(googleOAuthFrontendRedirect({ error }));
 
@@ -48,9 +43,6 @@ export const handleGoogleOAuthCallback = async (req: Request, res: Response) => 
     const returnedState = queryString(req.query.state);
     const { organizationId, codeVerifier } =
       await consumeGoogleOAuthState(req, res, returnedState);
-    if (providerDeniedAccess(req.query.error)) {
-      return redirectWithError(res, 'access_denied');
-    }
 
     const authorizationCode = queryString(req.query.code);
     if (!authorizationCode) return redirectWithError(res, 'missing_code');

@@ -10,11 +10,7 @@ const bearerTokenFromHeader = (header: unknown): string | null => {
 
 export function authMiddleware(req: Request, _res: Response, next: NextFunction) {
   try {
-    const token = bearerTokenFromHeader(req.headers.authorization);
-    if (!token) {
-      throw AppError.unauthorized('Missing or invalid Authorization header');
-    }
-
+    const token = bearerTokenFromHeader(req.headers.authorization) || '';
     const payload = verifyAccessToken(token);
 
     req.user = {

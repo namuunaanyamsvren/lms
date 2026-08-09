@@ -28,6 +28,11 @@ const ZIP_MIMES = new Set([
 const startsWith = (buffer: Buffer, bytes: readonly number[], offset = 0) =>
   bytes.every((byte, index) => buffer[offset + index] === byte);
 
+const scalarString = (value: unknown, field: string): string => {
+  if (typeof value !== 'string') throw AppError.badRequest(`${field} must be a single string`);
+  return value;
+};
+
 export function detectFileMime(buffer: Buffer): string | null {
   if (startsWith(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
     return 'image/png';
@@ -55,8 +60,9 @@ export function detectFileMime(buffer: Buffer): string | null {
   return null;
 }
 
-export function sanitizeUploadFilename(filename: string): string {
-  const printable = [...filename.normalize('NFKC')]
+export function sanitizeUploadFilename(filename: unknown): string {
+  const safeFilename = scalarString(filename, 'filename');
+  const printable = [...safeFilename.normalize('NFKC')]
     .filter(character => {
       const code = character.charCodeAt(0);
       return code >= 0x20 && code !== 0x7f;
@@ -82,8 +88,8 @@ export type InspectedUpload = {
 
 export function inspectUpload(
   buffer: Buffer,
-  declaredMime: string,
-  originalFilename: string,
+  declaredMime: unknown,
+  originalFilename: unknown,
   maxBytes = DEFAULT_UPLOAD_MAX_BYTES,
 ): InspectedUpload {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
@@ -93,7 +99,7 @@ export function inspectUpload(
     throw new AppError('Upload exceeds the permitted size', 413);
   }
 
-  const normalizedMime = declaredMime.split(';', 1)[0].trim().toLowerCase();
+  const normalizedMime = scalarString(declaredMime, 'content-type').split(';', 1)[0].trim().toLowerCase();
   const extensions = MIME_EXTENSIONS[normalizedMime];
   if (!extensions) throw AppError.badRequest('This file type is not allowed');
 

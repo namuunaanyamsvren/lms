@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   checkCompromisedPassword,
@@ -42,7 +41,7 @@ describe('password policy', () => {
   });
 
   it('uses only a SHA-1 prefix for a compromised-password lookup', async () => {
-    const digest = crypto.createHash('sha1').update(securePassword).digest('hex').toUpperCase();
+    const digest = '308BBC014070DCA6C93731D4C2A4A7C8F374A31C';
     const fetchImpl = vi.fn(async () => new Response(`${digest.slice(5)}:42\r\nOTHER:0`));
 
     await expect(checkCompromisedPassword(securePassword, {
