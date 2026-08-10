@@ -137,9 +137,9 @@ services:
       - key: REFRESH_COOKIE_NAME
         value: lms_refresh
       - key: REFRESH_COOKIE_PATH
-        value: /api/auth
+        value: /api/v1/auth
       - key: REFRESH_COOKIE_SAME_SITE
-        value: lax
+        value: none
       - key: FRONTEND_URL
         fromService:
           type: web

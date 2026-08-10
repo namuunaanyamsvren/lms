@@ -66,8 +66,9 @@ All 5 services (not gateway) share one Postgres instance, separated by schema �
 
 1. Render → `lms-gateway` → Environment: set `FRONTEND_URL` and `ALLOWED_ORIGINS` to your Vercel URL (e.g. `https://your-app.vercel.app`), and `TENANT_BASE_DOMAIN` to the same domain (e.g. `your-app.vercel.app`). These propagate automatically to the other 4 services via the Blueprint's `fromService` references — no need to repeat them.
 2. Render → `lms-auth-service` → Environment: set `GOOGLE_REDIRECT_URI` to your exact gateway URL plus `/api/v1/auth/google/callback` (for example, `https://lms-gateway-klai.onrender.com/api/v1/auth/google/callback`).
-3. Google Cloud Console → OAuth client → add that same URL to **Authorized redirect URIs**.
-4. Save — affected services redeploy automatically.
+3. Confirm `REFRESH_COOKIE_SAME_SITE=none` and `REFRESH_COOKIE_PATH=/api/v1/auth` on `lms-auth-service`; these are required when Vercel and Render use different sites.
+4. Google Cloud Console → OAuth client → add that same URL to **Authorized redirect URIs**.
+5. Save — affected services redeploy automatically.
 
 ## 7. Smoke test
 

@@ -20,4 +20,13 @@ describe('Render Blueprint service wiring', () => {
       expect(block).toContain('envVarKey: RENDER_EXTERNAL_URL');
     }
   });
+
+  it('uses cross-site cookies on the public versioned auth path', () => {
+    expect(blueprint).toMatch(
+      /- key: REFRESH_COOKIE_PATH\n\s+value: \/api\/v1\/auth/,
+    );
+    expect(blueprint).toMatch(
+      /- key: REFRESH_COOKIE_SAME_SITE\n\s+value: none/,
+    );
+  });
 });
