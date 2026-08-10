@@ -21,14 +21,18 @@ export const inferredTenantKey = () => {
 export const resolveTenant = async key => {
   const normalized = normalizeTenantKey(key || inferredTenantKey());
   if (!normalized) throw new Error('Байгууллагын богино нэрийг оруулна уу.');
-  if (demoLoginEnabled && normalized === 'mongol-erdem') {
-    return { id: 'org_main', name: 'Монгол Эрдэм Их Сургууль', slug: 'mongol-erdem' };
+  let response;
+  try {
+    response = await authRequest({
+      url: `/organizations/resolve?host=${encodeURIComponent(normalized)}`,
+      method: 'GET',
+    });
+  } catch (error) {
+    if (demoLoginEnabled && normalized === 'mongol-erdem') {
+      return { id: 'org_main', name: 'Монгол Эрдэм Их Сургууль', slug: 'mongol-erdem' };
+    }
+    throw error;
   }
-
-  const response = await authRequest({
-    url: `/organizations/resolve?host=${encodeURIComponent(normalized)}`,
-    method: 'GET',
-  });
   const tenant = response.data;
   if (!tenant?.id) throw new Error('Байгууллага олдсонгүй. Байгууллагын богино нэр зөв эсэхийг шалгана уу.');
   if (typeof document !== 'undefined' && tenant.primaryColor) {
