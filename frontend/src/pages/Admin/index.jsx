@@ -14,21 +14,44 @@ const metricPercent = (metric) => {
   return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
 };
 
+const emptyDashboardData = {
+  stats: {
+    students: 0,
+    instructors: 0,
+    staff: 0,
+    courses: 0,
+    activeCohorts: 0,
+    averageAttendancePct: null,
+  },
+  activityOverview: {
+    userGrowth: { label: 'Хэрэглэгчийн өсөлт (сүүлийн 30 хоног)', value: '—' },
+    courseEngagement: { label: 'Хичээлийн идэвх (сүүлийн 30 хоног)', value: '—' },
+  },
+  activityMetrics: [],
+  recentUsers: [],
+  atRiskSummary: { total: 0, studentCount: 0, courseCount: 0, items: [] },
+  systemLogs: [],
+  systemStatus: [
+    { label: 'Academic Service', value: 'Түр хугацаанд мэдээлэл авах боломжгүй', status: 'UNKNOWN' },
+  ],
+};
+
 export default function Admin() {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [warning, setWarning] = useState(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        setError(null);
+        setWarning(null);
         const data = await getAdminDashboardData();
         setDashboardData(data);
       } catch (err) {
-        setError('Менежерийн хяналтын самбарын мэдээллийг ачааллахад алдаа гарлаа.');
+        setDashboardData(emptyDashboardData);
+        setWarning('Менежерийн хяналтын самбарын зарим мэдээлэл түр ачаалсангүй. Хуудсаа дахин сэргээгээрэй.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -41,10 +64,6 @@ export default function Admin() {
 
   if (loading) {
     return <div className="space-y-6">Ачааллаж байна...</div>;
-  }
-
-  if (error) {
-    return <div className="space-y-6">{error}</div>;
   }
 
   const stats = [
@@ -72,6 +91,12 @@ export default function Admin() {
           </>
         }
       />
+
+      {warning && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {warning}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((item, index) => (
@@ -180,8 +205,13 @@ export default function Admin() {
           </Card>
 
           <Card title="Сүүлд бүртгэгдсэн хэрэглэгчид">
-            <div className="space-y-3">
-              {dashboardData.recentUsers.map((usr, index) => (
+            {dashboardData.recentUsers.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                Сүүлийн хэрэглэгчийн мэдээлэл одоогоор алга.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {dashboardData.recentUsers.map((usr, index) => (
                 <div key={index} className="flex items-center justify-between rounded-3xl bg-white p-4 border border-slate-200">
                   <div>
                     <p className="font-medium text-slate-900">{usr.name}</p>
@@ -191,8 +221,9 @@ export default function Admin() {
                     DB Хэрэглэгч
                   </span>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
 

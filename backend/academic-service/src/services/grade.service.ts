@@ -607,11 +607,12 @@ export const getAtRiskStudents = async (organizationId: string, actor: Actor, co
     .sort((a, b) => (a.percent ?? 0) - (b.percent ?? 0));
 };
 
-export const getOrganizationAtRiskSummary = async (organizationId: string, limit = 5) => {
+export const getOrganizationAtRiskSummary = async (organizationId: string, limit = 5, maxCourses = 8) => {
   const courses = await prisma.course.findMany({
     where: { organizationId, deletedAt: null },
     select: { id: true, title: true },
     orderBy: { createdAt: 'desc' },
+    take: Math.max(limit, maxCourses),
   });
   const [gradingScale, riskPolicy] = await Promise.all([
     getOrganizationGradingScale(organizationId),
