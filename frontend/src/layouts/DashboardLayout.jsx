@@ -23,7 +23,7 @@ export default function DashboardLayout() {
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50 text-slate-900">
+    <div data-dashboard-shell className="flex h-screen flex-col bg-slate-50 text-slate-900">
       {/* Top Navigation */}
       <TopNavigation
         onSidebarToggle={toggleSidebar}
