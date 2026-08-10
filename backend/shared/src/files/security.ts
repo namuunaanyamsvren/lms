@@ -245,6 +245,7 @@ export function createSignedFileUrl(input: {
   const expiresAt = Math.floor((input.now ?? new Date()).getTime() / 1000) + expiresInSeconds;
   const signature = sign(organizationId, fileKey, expiresAt);
   const url = new URL(baseUrl);
+  if (url.pathname === '/') url.pathname = '/api/v1/uploads/download';
   url.searchParams.set('key', fileKey);
   url.searchParams.set('organizationId', organizationId);
   url.searchParams.set('expires', String(expiresAt));

@@ -50,13 +50,13 @@ All 5 services (not gateway) share one Postgres instance, separated by schema �
 
 ## 4. Backend — confirm service URLs
 
-`render.yaml` hardcodes cross-service URLs as `https://lms-<service>.onrender.com` (Render's default hostname from the `name:` field). Check each service's **Settings** page for its actual assigned URL. If Render appended a suffix (name collision), update the corresponding `*_SERVICE_URL` env var(s) by hand and redeploy.
+`render.yaml` copies each web service's Render-provided `RENDER_EXTERNAL_URL` into the corresponding `*_SERVICE_URL`. This preserves suffixes Render adds after a hostname collision (for example, `-klai`) and avoids manual proxy wiring. After changing an existing Blueprint, run **Sync Blueprint** and verify the updated values in each service's **Environment** page.
 
 ## 5. Frontend — Vercel
 
 1. Vercel dashboard → **Add New Project** → import this repo → set **Root Directory** to `frontend`. Vercel auto-detects Vite (`npm run build`, output `dist`); `frontend/vercel.json` already handles the SPA rewrite.
 2. Project → Settings → Environment Variables:
-   - `VITE_API_BASE_URL` = `https://lms-gateway.onrender.com/api/v1`
+   - `VITE_API_BASE_URL` = your gateway's exact Render URL plus `/api/v1` (for example, `https://lms-gateway-klai.onrender.com/api/v1`)
    - `VITE_TENANT_BASE_DOMAIN` = your Vercel deployment domain (e.g. `your-app.vercel.app`)
    - `VITE_ENABLE_DEMO_LOGIN` = `false`
    - The legal/contact vars in `frontend/.env.example` (`VITE_LEGAL_ENTITY_NAME`, `VITE_PRIVACY_CONTACT_EMAIL`, `VITE_SUPPORT_EMAIL`, `VITE_LEGAL_EFFECTIVE_DATE`)
@@ -65,14 +65,14 @@ All 5 services (not gateway) share one Postgres instance, separated by schema �
 ## 6. Wire the two together
 
 1. Render → `lms-gateway` → Environment: set `FRONTEND_URL` and `ALLOWED_ORIGINS` to your Vercel URL (e.g. `https://your-app.vercel.app`), and `TENANT_BASE_DOMAIN` to the same domain (e.g. `your-app.vercel.app`). These propagate automatically to the other 4 services via the Blueprint's `fromService` references — no need to repeat them.
-2. Render → `lms-auth-service` → Environment: set `GOOGLE_REDIRECT_URI` to `https://lms-gateway.onrender.com/api/v1/auth/google/callback`.
+2. Render → `lms-auth-service` → Environment: set `GOOGLE_REDIRECT_URI` to your exact gateway URL plus `/api/v1/auth/google/callback` (for example, `https://lms-gateway-klai.onrender.com/api/v1/auth/google/callback`).
 3. Google Cloud Console → OAuth client → add that same URL to **Authorized redirect URIs**.
 4. Save — affected services redeploy automatically.
 
 ## 7. Smoke test
 
 ```
-curl https://lms-gateway.onrender.com/health
+curl https://<your-exact-gateway-host>/health
 ```
 
 Should return 200. Then load your Vercel URL and exercise login end-to-end. Check each Render service's **Logs** tab for `prisma migrate deploy` succeeding followed by the server starting.

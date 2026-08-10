@@ -65,6 +65,19 @@ describe('file admission security', () => {
 });
 
 describe('tenant-bound signed file URLs', () => {
+  it('adds the versioned gateway download path to a Render service URL', () => {
+    process.env.FILE_SIGNING_SECRET = 's'.repeat(48);
+    process.env.FILE_DOWNLOAD_BASE_URL = 'https://lms-gateway-klai.onrender.com';
+
+    const signed = createSignedFileUrl({
+      organizationId: 'org-a',
+      fileKey: 'org-a/course/cover.png',
+      now: new Date('2026-07-30T00:00:00.000Z'),
+    });
+
+    expect(new URL(signed.url).pathname).toBe('/api/v1/uploads/download');
+  });
+
   it('expires, detects tampering, and rejects another tenant key', () => {
     process.env.FILE_SIGNING_SECRET = 's'.repeat(48);
     process.env.FILE_DOWNLOAD_BASE_URL = 'https://api.example.test/api/uploads/download';

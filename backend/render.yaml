@@ -45,15 +45,30 @@ services:
           name: lms-redis
           property: connectionString
       - key: AUTH_SERVICE_URL
-        value: https://lms-auth-service.onrender.com
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ORGANIZATION_SERVICE_URL
-        value: https://lms-organization-service.onrender.com
+        fromService:
+          type: web
+          name: lms-organization-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ACADEMIC_SERVICE_URL
-        value: https://lms-academic-service.onrender.com
+        fromService:
+          type: web
+          name: lms-academic-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: BILLING_SERVICE_URL
-        value: https://lms-billing-service.onrender.com
+        fromService:
+          type: web
+          name: lms-billing-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: NOTIFICATION_SERVICE_URL
-        value: https://lms-notification-service.onrender.com
+        fromService:
+          type: web
+          name: lms-notification-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FEATURE_BILLING_ENABLED
         value: "false"
       - key: ACCESS_TOKEN_SECRET
@@ -158,9 +173,15 @@ services:
       - key: PASSWORD_COMPROMISED_CHECK_FAILURE_MODE
         value: allow
       - key: ORGANIZATION_SERVICE_URL
-        value: https://lms-organization-service.onrender.com
+        fromService:
+          type: web
+          name: lms-organization-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ACADEMIC_SERVICE_URL
-        value: https://lms-academic-service.onrender.com
+        fromService:
+          type: web
+          name: lms-academic-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -221,13 +242,25 @@ services:
           name: lms-gateway
           envVarKey: TENANT_BASE_DOMAIN
       - key: AUTH_SERVICE_URL
-        value: https://lms-auth-service.onrender.com
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ACADEMIC_SERVICE_URL
-        value: https://lms-academic-service.onrender.com
+        fromService:
+          type: web
+          name: lms-academic-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: BILLING_SERVICE_URL
-        value: https://lms-billing-service.onrender.com
+        fromService:
+          type: web
+          name: lms-billing-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: NOTIFICATION_SERVICE_URL
-        value: https://lms-notification-service.onrender.com
+        fromService:
+          type: web
+          name: lms-notification-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FEATURE_BILLING_ENABLED
         value: "false"
 
@@ -278,17 +311,29 @@ services:
           name: lms-gateway
           envVarKey: ALLOWED_ORIGINS
       - key: AUTH_SERVICE_URL
-        value: https://lms-auth-service.onrender.com
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: BILLING_SERVICE_URL
-        value: https://lms-billing-service.onrender.com
+        fromService:
+          type: web
+          name: lms-billing-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: NOTIFICATION_SERVICE_URL
-        value: https://lms-notification-service.onrender.com
+        fromService:
+          type: web
+          name: lms-notification-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FEATURE_BILLING_ENABLED
         value: "false"
       - key: FILE_SIGNING_SECRET
         generateValue: true
       - key: FILE_DOWNLOAD_BASE_URL
-        value: https://lms-gateway.onrender.com/api/uploads/download
+        fromService:
+          type: web
+          name: lms-gateway
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FILE_STORAGE_DIRECTORY
         value: /data/private-uploads
       - key: FILE_STORAGE_AT_REST_ENCRYPTED
@@ -343,9 +388,15 @@ services:
           name: lms-gateway
           envVarKey: ALLOWED_ORIGINS
       - key: AUTH_SERVICE_URL
-        value: https://lms-auth-service.onrender.com
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ORGANIZATION_SERVICE_URL
-        value: https://lms-organization-service.onrender.com
+        fromService:
+          type: web
+          name: lms-organization-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -406,7 +457,10 @@ services:
           name: lms-gateway
           envVarKey: ALLOWED_ORIGINS
       - key: AUTH_SERVICE_URL
-        value: https://lms-auth-service.onrender.com
+        fromService:
+          type: web
+          name: lms-auth-service
+          envVarKey: RENDER_EXTERNAL_URL
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
