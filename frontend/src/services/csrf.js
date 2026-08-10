@@ -3,6 +3,7 @@ const CSRF_COOKIE_NAME = import.meta.env.VITE_CSRF_COOKIE_NAME || 'lms_csrf';
 const CSRF_HEADER_NAME = import.meta.env.VITE_CSRF_HEADER_NAME || 'x-csrf-token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 let cachedCsrfToken = null;
+let csrfRequestPromise = null;
 
 const readCookie = name => {
   const prefix = `${encodeURIComponent(name)}=`;
@@ -20,16 +21,26 @@ export const ensureCsrfToken = async (forceRefresh = false) => {
   const existing = getCsrfToken() || cachedCsrfToken;
   if (existing && !forceRefresh) return existing;
 
-  const response = await fetch(`${BASE_API_URL}/auth/csrf-token`, {
-    method: 'GET',
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('CSRF token авахад алдаа гарлаа.');
-  const data = await response.json().catch(() => ({}));
-  const token = getCsrfToken() || data?.data?.token;
-  if (!token) throw new Error('CSRF cookie тохируулагдсангүй.');
-  cachedCsrfToken = token;
-  return token;
+  if (!csrfRequestPromise) {
+    csrfRequestPromise = (async () => {
+      const response = await fetch(`${BASE_API_URL}/auth/csrf-token`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('CSRF token авахад алдаа гарлаа.');
+      const data = typeof response.json === 'function'
+        ? await response.json().catch(() => ({}))
+        : {};
+      const token = getCsrfToken() || data?.data?.token || data?.token;
+      if (!token) throw new Error('CSRF cookie тохируулагдсангүй.');
+      cachedCsrfToken = token;
+      return token;
+    })().finally(() => {
+      csrfRequestPromise = null;
+    });
+  }
+
+  return csrfRequestPromise;
 };
 
 export const withCsrf = async (options = {}) => {

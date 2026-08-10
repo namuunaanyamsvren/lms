@@ -60,6 +60,17 @@ describe('CSRF protection', () => {
     expect(bootstrap.headers['set-cookie']?.[0]).toContain(`${getCsrfCookieName()}=`);
     expect(bootstrap.headers['set-cookie']?.[0]).not.toContain('HttpOnly');
   });
+
+  it('reuses a valid CSRF cookie instead of rotating it during concurrent bootstrap', async () => {
+    const token = createCsrfToken();
+    const bootstrap = await request(buildCsrfApp())
+      .get('/csrf-token')
+      .set('Cookie', csrfCookie(token));
+
+    expect(bootstrap.status).toBe(200);
+    expect(bootstrap.body.data.token).toBe(token);
+    expect(bootstrap.headers['set-cookie']).toBeUndefined();
+  });
 });
 
 describe('credentialed exact-origin CORS', () => {

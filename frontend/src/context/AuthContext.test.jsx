@@ -67,6 +67,7 @@ describe('authoritative authentication state', () => {
     resetApiClientForTests();
     resetAuthSessionForTests();
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
     document.cookie = 'lms_csrf=test-csrf-token; path=/';
     auth = null;
   });
@@ -229,6 +230,21 @@ describe('authoritative authentication state', () => {
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
     expect(calls).toEqual([]);
     expect(getAccessToken()).toBeNull();
+  });
+
+  it('does not restore a previous session during the Google OAuth callback', async () => {
+    const calls = [];
+    authClient.defaults.adapter = async config => {
+      calls.push(config.url);
+      return axiosResponse(config, { data: { token: accessToken() } });
+    };
+    markBrowserSessionPresent();
+    window.history.replaceState({}, '', '/auth/google/callback?code=exchange-code');
+
+    renderProvider();
+
+    await waitFor(() => expect(auth.authStatus).toBe('unauthenticated'));
+    expect(calls).toEqual([]);
   });
 
   it('finishes bootstrap logged out when refresh fails', async () => {

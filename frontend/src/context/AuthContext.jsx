@@ -60,7 +60,10 @@ const getAuthenticatedRedirectPath = user =>
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setTokenState] = useState(() => getAccessToken());
-  const [authStatus, setAuthStatus] = useState('loading');
+  const [authStatus, setAuthStatus] = useState(() =>
+    typeof window !== 'undefined' && window.location.pathname === '/auth/google/callback'
+      ? 'unauthenticated'
+      : 'loading');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -84,6 +87,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let active = true;
+    if (typeof window !== 'undefined' && window.location.pathname === '/auth/google/callback') {
+      return () => {
+        active = false;
+      };
+    }
     restoreSessionOnce()
       .then(session => {
         if (!active) return;

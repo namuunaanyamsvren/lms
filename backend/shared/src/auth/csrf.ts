@@ -81,8 +81,11 @@ export const setCsrfCookie = (res: Response) => {
   return token;
 };
 
-export const issueCsrfToken = (_req: Request, res: Response) => {
-  const token = setCsrfCookie(res);
+export const issueCsrfToken = (req: Request, res: Response) => {
+  const cookieToken = readCookie(req, getCsrfCookieName());
+  const token = cookieToken && isValidSignedToken(cookieToken)
+    ? cookieToken
+    : setCsrfCookie(res);
   return res.json({ success: true, data: { token, headerName: getCsrfHeaderName() } });
 };
 
