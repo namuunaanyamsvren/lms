@@ -136,10 +136,10 @@ export default function Notifications() {
           {filteredNotifications.map((notification) => (
             <div
               key={notification.id}
-              className={`bg-white dark:bg-slate-800 rounded-xl border ${
-                notification.read 
-                  ? 'border-slate-200 dark:border-slate-700' 
-                  : 'border-indigo-200 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/20'
+              className={`bg-white rounded-xl border ${
+                notification.read
+                  ? 'border-slate-200'
+                  : 'border-indigo-200 bg-indigo-50/50'
               } p-4 hover:shadow-md transition-all`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -148,13 +148,13 @@ export default function Notifications() {
                     {!notification.read && (
                       <span className="h-2 w-2 rounded-full bg-indigo-600" />
                     )}
-                    <h3 className={`font-semibold text-slate-900 dark:text-slate-100 ${
+                    <h3 className={`font-semibold text-slate-900 ${
                       notification.read ? 'text-sm' : 'text-base'
                     }`}>
                       {notification.title}
                     </h3>
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  <p className="text-sm text-slate-600 mt-1">
                     {notification.description}
                   </p>
                   <p className="text-xs text-slate-400 mt-2">

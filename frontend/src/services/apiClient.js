@@ -124,7 +124,7 @@ authClient.interceptors.response.use(
   },
 );
 
-export const refreshAccessToken = async () => {
+const performRefreshAccessToken = async () => {
   const response = await authClient.post('/auth/refresh', null, {
     headers: await csrfHeaders('POST'),
   });
@@ -135,19 +135,21 @@ export const refreshAccessToken = async () => {
   return token;
 };
 
-export const requestAccessTokenRefresh = () => {
+export const refreshAccessToken = () => {
   if (!refreshPromise) {
-    refreshPromise = refreshAccessToken()
-      .catch(error => {
-        handleAuthFailure(error);
-        throw error;
-      })
+    refreshPromise = performRefreshAccessToken()
       .finally(() => {
         refreshPromise = null;
       });
   }
   return refreshPromise;
 };
+
+export const requestAccessTokenRefresh = () =>
+  refreshAccessToken().catch(error => {
+    handleAuthFailure(error);
+    throw error;
+  });
 
 apiClient.interceptors.request.use(async config => {
   const token = getAccessToken();

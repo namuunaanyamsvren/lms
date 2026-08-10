@@ -6,25 +6,25 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700;
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-50;
   }
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover;
   }
   .course-builder label {
-    @apply text-sm font-medium text-slate-700 dark:text-slate-200;
+    @apply text-sm font-medium text-slate-700;
   }
   .course-builder input, .course-builder textarea, .course-builder select {
-    @apply mt-1 block w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 font-normal;
+    @apply mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal;
   }
   .panel {
-    @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5;
+    @apply bg-white border border-slate-200 rounded-xl p-5;
   }
   .tag {
-    @apply inline-block bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1.5 text-sm;
+    @apply inline-block bg-slate-100 rounded-lg px-3 py-1.5 text-sm;
   }
   .quiz-form input:not([type="checkbox"]), .quiz-form textarea, .quiz-form select {
-    @apply mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-900 px-3 py-2;
+    @apply mt-1 w-full rounded-lg border border-slate-200 px-3 py-2;
   }
   .quiz-form label {
     @apply text-sm font-medium;
@@ -33,7 +33,7 @@
     @apply mr-2;
   }
   table th, table td {
-    @apply text-left border-b border-slate-200 dark:border-slate-700 p-3;
+    @apply text-left border-b border-slate-200 p-3;
   }
 }
 
@@ -44,11 +44,11 @@
   --color-primary-hover-rgb: 67 56 202;
   --color-secondary: #0EA5E9;
   --color-secondary-rgb: 14 165 233;
-  --color-background: #F8FAFC;
-  --color-background-rgb: 248 250 252;
+  --color-background: #FFFFFF;
+  --color-background-rgb: 255 255 255;
   --color-card: #FFFFFF;
   --color-card-rgb: 255 255 255;
-  --color-surface: #F8FAFC;
+  --color-surface: #FFFFFF;
   --color-text: #0F172A;
   --color-text-rgb: 15 23 42;
   --color-border: #E2E8F0;
@@ -76,35 +76,6 @@
   --space-lg: 2rem;
   --space-xl: 3rem;
   --space-2xl: 4rem;
-}
-
-.dark {
-  --color-primary: #6366F1;
-  --color-primary-rgb: 99 102 241;
-  --color-primary-hover: #818CF8;
-  --color-primary-hover-rgb: 129 140 248;
-  --color-secondary: #38BDF8;
-  --color-secondary-rgb: 56 189 248;
-  --color-background: #0F172A;
-  --color-background-rgb: 15 23 42;
-  --color-card: #1E293B;
-  --color-card-rgb: 30 41 59;
-  --color-surface: #1E293B;
-  --color-text: #F8FAFC;
-  --color-text-rgb: 248 250 252;
-  --color-border: #334155;
-  --color-border-rgb: 51 65 85;
-  --color-muted: #94A3B8;
-  --color-muted-rgb: 148 163 184;
-  --color-success: #22C55E;
-  --color-success-rgb: 34 197 94;
-  --color-warning: #FBBF24;
-  --color-warning-rgb: 251 191 36;
-  --color-error: #EF4444;
-  --color-error-rgb: 239 68 68;
-  --color-info: #38BDF8;
-  --color-info-rgb: 56 189 248;
-  --shadow-soft: 0 20px 55px rgba(0, 0, 0, 0.35);
 }
 
 *,
@@ -146,16 +117,6 @@ h6 {
   color: var(--color-text);
   font-weight: 700;
   letter-spacing: 0;
-}
-
-p,
-span,
-li,
-a,
-button,
-input,
-label {
-  color: var(--color-text);
 }
 
 :focus-visible {

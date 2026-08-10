@@ -31,11 +31,22 @@ model Subscription {
   billingCycle   String      @default("monthly")
   isActive       Boolean     @default(true)
   nextBillingAt  DateTime
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  stripePriceId  String?
+  status         String?
+  currentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  trialEnd       DateTime?
+  paymentFailure String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   invoices       Invoice[]
 
   @@index([organizationId])
+  @@index([status, nextBillingAt])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model Invoice {

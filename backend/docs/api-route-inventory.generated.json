@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-08T07:53:23.011Z",
+  "generatedAt": "2026-08-09T07:24:10.912Z",
   "routeCount": 237,
   "routes": [
     {
@@ -1760,7 +1760,6 @@
       "source": "organization-service/src/routes/index.ts",
       "auth": "BEARER",
       "roles": [
-        "ORG_ADMIN",
         "SUPER_ADMIN"
       ]
     },

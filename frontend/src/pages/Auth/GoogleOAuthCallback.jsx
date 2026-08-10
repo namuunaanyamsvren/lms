@@ -28,7 +28,9 @@ export default function GoogleOAuthCallback() {
     if (started.current) return;
     started.current = true;
 
-    if (providerError || !code) return;
+    if (providerError || !code) {
+      return;
+    }
 
     void completeGoogleLogin(code).then(result => {
       if (result.success) {

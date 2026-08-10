@@ -103,26 +103,26 @@ export default function CalendarWithNotes({ className = '' }) {
   const selectedDateNotes = selectedDate ? notes[selectedDate] || [] : [];
 
   return (
-    <div className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className}`}>
+    <div className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <StickyNote size={18} className="text-indigo-600 dark:text-indigo-400" />
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+          <StickyNote size={18} className="text-indigo-600" />
+          <h3 className="text-base font-semibold text-slate-900">
             Календарь & Тэмдэглэл ({year} {MONTH_NAMES_MN[month]})
           </h3>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handlePrevMonth}
-            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
             aria-label="Өмнөх сар"
           >
             <ChevronLeft size={18} aria-hidden />
           </button>
           <button
             onClick={handleNextMonth}
-            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
             aria-label="Дараах сар"
           >
             <ChevronRight size={18} aria-hidden />
@@ -164,14 +164,14 @@ export default function CalendarWithNotes({ className = '' }) {
               className={`relative flex flex-col items-center justify-center rounded-xl py-2 transition-all ${
                 currentIsToday
                   ? 'bg-indigo-600 font-bold text-white shadow-sm'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                  : 'hover:bg-slate-100 text-slate-700'
               }`}
             >
               <span>{dayNum}</span>
               {hasNotes && (
                 <span
                   className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
-                    currentIsToday ? 'bg-amber-300' : 'bg-indigo-600 dark:bg-indigo-400'
+                    currentIsToday ? 'bg-amber-300' : 'bg-indigo-600'
                   }`}
                   title={`${dayNotes.length} тэмдэглэл`}
                 />
@@ -190,18 +190,18 @@ export default function CalendarWithNotes({ className = '' }) {
             aria-modal="true"
             aria-labelledby="calendar-note-title"
             tabIndex={-1}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl outline-none dark:bg-slate-800"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl outline-none"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-700">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <StickyNote size={18} aria-hidden className="text-indigo-600" />
-                <h4 id="calendar-note-title" className="font-semibold text-slate-900 dark:text-slate-100">
+                <h4 id="calendar-note-title" className="font-semibold text-slate-900">
                   {selectedDate} — Тэмдэглэл
                 </h4>
               </div>
               <button
                 onClick={() => setSelectedDate(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 aria-label="Тэмдэглэлийн цонх хаах"
               >
                 <X size={18} aria-hidden />
@@ -218,10 +218,10 @@ export default function CalendarWithNotes({ className = '' }) {
                 selectedDateNotes.map((note) => (
                   <div
                     key={note.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-700/50"
+                    className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm"
                   >
                     <div>
-                      <p className="text-slate-800 dark:text-slate-100">{note.text}</p>
+                      <p className="text-slate-800">{note.text}</p>
                       <p className="mt-1 text-[10px] text-slate-400">{note.createdAt}</p>
                     </div>
                     <button
@@ -244,7 +244,7 @@ export default function CalendarWithNotes({ className = '' }) {
                 onChange={(e) => setNewNoteText(e.target.value)}
                 placeholder="Тэмдэглэл бичих..."
                 aria-label="Тэмдэглэл бичих"
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400"
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 autoFocus
               />
               <button

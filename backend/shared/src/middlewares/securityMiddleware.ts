@@ -1,4 +1,4 @@
-import { Application } from 'express';
+import { Application, Request, Response } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -19,7 +19,7 @@ const normalizedEndpoint = (path: string) =>
 
 export function applyHttpSecurity(
   app: Application,
-  options: { rateLimitMax?: number; windowMs?: number } = {},
+  options: { rateLimitMax?: number; windowMs?: number; skipRateLimit?: (req: Request, res: Response) => boolean } = {},
 ) {
   applyHttpSecurityHeaders(app);
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -28,6 +28,7 @@ export function applyHttpSecurity(
     max: options.rateLimitMax ?? 300,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: options.skipRateLimit,
     message: { success: false, message: 'Too many requests. Please try again later.' },
   }));
 }

@@ -2,10 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import PageHeader from '../../components/ui/PageHeader';
-import StatCard from '../../components/ui/StatCard';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { getStudentDashboardData } from '../../services/api';
-import { BookOpen, FileCheck2, Activity, Bell, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const formatDateTime = (value) => new Date(value).toLocaleString('mn-MN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -27,24 +26,9 @@ export default function Student() {
     );
   }
 
-  const stats = [
-    { title: 'Хичээлүүд', value: data.stats.courses, icon: BookOpen, href: '/student/courses' },
-    { title: 'Даалгавар', value: data.stats.assignments, icon: FileCheck2, href: '/student/assignments' },
-    { title: 'Шалгалт', value: data.stats.exams, icon: Activity, href: '/student/quizzes' },
-    { title: 'Ирцийн хувь', value: data.engagement?.value || '—', icon: Bell, href: '/student/attendance' },
-  ];
-
   return (
     <div className="space-y-6">
       <PageHeader title="Тавтай морил" subtitle="Таны сургалтын үйл ажиллагааны тойм." />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <Link key={i} to={s.href}>
-            <StatCard title={s.title} value={s.value} icon={s.icon} />
-          </Link>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

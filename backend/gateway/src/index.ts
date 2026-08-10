@@ -47,6 +47,7 @@ const apiLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: req => req.method === 'GET' && req.path === '/organizations/resolve',
   message: { success: false, message: 'Too many requests. Please try again later.' },
 });
 app.use('/api', apiLimiter);
@@ -73,6 +74,8 @@ const publicAuthRoutes = new Set([
   'GET /api/v1/auth/google/callback',
   'POST /api/v1/auth/google/exchange',
   'POST /api/v1/organizations/onboard',
+  'POST /api/v1/payments/onboarding/stripe-checkout',
+  'POST /api/v1/payments/stripe/webhook',
   'GET /api/v1/organizations/resolve',
   'GET /api/v1/organizations/public',
   'GET /api/v1/uploads/download',

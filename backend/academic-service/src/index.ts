@@ -21,6 +21,7 @@ import { startAcademicEventReconciliation } from './services/event-reconciliatio
 import { exportUserAcademicData } from './controllers/privacy.controller';
 import { startReportProcessing } from './services/report-job.service';
 import { prisma } from './lib/prisma';
+import { createApprovedGuardianLinkInternal } from './controllers/guardian.controller';
 
 const app = express();
 const logger = createLogger('academic-service');
@@ -65,6 +66,12 @@ app.get(
   internalAuth,
   requireInternalService('auth-service'),
   asyncHandler(exportUserAcademicData),
+);
+app.post(
+  '/internal/guardian-links/approved',
+  internalAuth,
+  requireInternalService('notification-service'),
+  asyncHandler(createApprovedGuardianLinkInternal),
 );
 app.use('/api', routes);
 

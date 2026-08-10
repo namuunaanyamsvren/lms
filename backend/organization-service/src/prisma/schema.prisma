@@ -9,10 +9,14 @@ generator client {
 }
 
 enum OrgStatus {
+  PENDING_PAYMENT
+  TRIAL
   ACTIVE
+  PAST_DUE
   SUSPENDED
-  ARCHIVED
+  CANCELED
   CANCELLED
+  ARCHIVED
 }
 
 model Organization {
@@ -31,6 +35,7 @@ model Organization {
   settings  OrgSettings?
 
   @@index([status, deletedAt])
+  @@index([createdAt])
 }
 
 model OrgSettings {
@@ -56,4 +61,44 @@ model OrgSettings {
   updatedAt                DateTime     @updatedAt
 
   @@index([organizationId])
+}
+
+model PlatformPlan {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  description  String?
+  price        Decimal  @db.Decimal(19, 4)
+  currency     String   @default("MNT") @db.VarChar(3)
+  billingCycle String   @default("monthly")
+  maxUsers     Int      @default(100)
+  maxCourses   Int      @default(50)
+  featuresJson String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model PlatformAuditLog {
+  id             String   @id @default(uuid())
+  actorUserId    String
+  actorRole      String
+  organizationId String?
+  action         String
+  targetType     String
+  targetId       String?
+  reason         String?
+  previousValue  String?
+  newValue       String?
+  ipAddress      String?
+  userAgent      String?
+  requestId      String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
 }

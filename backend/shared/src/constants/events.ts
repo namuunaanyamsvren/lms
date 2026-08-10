@@ -3,6 +3,7 @@ export const EVENT_EXCHANGE = 'lms.events';
 export const EVENTS = {
   USER_CREATED: 'user.created',
   USER_INVITED: 'user.invited',
+  GUARDIAN_INVITE_REQUESTED: 'guardian.invite.requested',
   USER_UPDATED: 'user.updated',
   USER_DEACTIVATED: 'user.deactivated',
   USER_ANONYMIZED: 'user.anonymized',

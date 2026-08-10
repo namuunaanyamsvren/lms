@@ -5,7 +5,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { getPrincipalDashboardData } from '../../services/api';
-import { BarChart2, Users, Calendar, Layers, Star, ArrowRight, Cpu, ArrowUpRight } from 'lucide-react';
+import { BarChart2, Users, Calendar, Layers, Star, ArrowRight, Cpu } from 'lucide-react';
 
 function MiniSeries({ items = [], suffix = '' }) {
   const max = Math.max(...items.map(item => Number(item.value) || 0), 1);
@@ -122,10 +122,7 @@ export default function Principal() {
             </div>
           </Card>
 
-          <Card
-            title="Сүүлийн үйл ажиллагаа"
-            right={<Link to="/principal/audit-log" className="text-xs font-semibold text-indigo-600 flex items-center gap-1">Бүгд <ArrowRight size={13} /></Link>}
-          >
+          <Card title="Сүүлийн үйл ажиллагаа">
             {data.activityFeed.length === 0 ? (
               <p className="text-sm text-slate-500">Үйл ажиллагаа алга байна.</p>
             ) : (
@@ -143,7 +140,7 @@ export default function Principal() {
             )}
           </Card>
 
-          <Card title="Системийн төлөв" right={<Link to="/principal/audit-log"><ArrowUpRight size={15} className="text-slate-400" /></Link>}>
+          <Card title="Системийн төлөв">
             <div className="rounded-3xl bg-slate-50 p-4 border border-slate-200">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-500">Платформын байдал</p>

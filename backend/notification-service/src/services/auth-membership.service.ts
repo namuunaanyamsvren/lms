@@ -4,6 +4,7 @@ export async function approveStudentMembership(input: {
   organizationId: string;
   userId: string;
   approvedById: string;
+  role?: string;
 }) {
   const baseUrl = process.env.AUTH_SERVICE_URL;
   if (!baseUrl) throw new Error('AUTH_SERVICE_URL is required to approve organization membership');
@@ -22,7 +23,7 @@ export async function approveStudentMembership(input: {
       method: 'PUT',
       body: JSON.stringify({
         userId: input.userId,
-        role: 'STUDENT',
+        role: input.role || 'STUDENT',
         source: 'STUDENT_ACCESS_REQUEST',
         approvedById: input.approvedById,
       }),

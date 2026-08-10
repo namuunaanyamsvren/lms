@@ -11,7 +11,6 @@ import StudentAssignments from '../pages/Student/Assignments';
 import StudentGradebook from '../pages/Student/Gradebook';
 import StudentAttendance from '../pages/Student/AttendanceDetail';
 import StudentCertificates from '../pages/Student/Certificates';
-import StudentPayments from '../pages/Student/Payments';
 import CertificateVerify from '../pages/CertificateVerify';
 import AdminCertificates from '../pages/Admin/Certificates';
 import Notifications from '../pages/Notifications';
@@ -28,12 +27,11 @@ import ParentAttendanceDetail from '../pages/Parent/AttendanceDetail';
 import Staff from '../pages/Staff';
 import StaffWorkflows from '../pages/Staff/Workflows';
 import Admin from '../pages/Admin';
-import AdminAuditLog from '../pages/Admin/AuditLog';
 import AdminReports from '../pages/Admin/Reports';
 import AdminCourseOversight from '../pages/Admin/CourseOversight';
 import AdminSystemHealth from '../pages/Admin/SystemHealth';
 import AdminBilling from '../pages/Admin/Billing';
-import Organizations from '../pages/Admin/Organizations';
+import SuperAdmin from '../pages/SuperAdmin';
 import Principal from '../pages/Principal';
 import CourseCatalog from '../pages/Courses/CourseCatalog';
 import CourseDetail from '../pages/Courses/CourseDetail';
@@ -222,7 +220,6 @@ const router = createBrowserRouter([
       { path: 'grades', element: <StudentGradebook /> },
       { path: 'attendance', element: <StudentAttendance /> },
       { path: 'certificates', element: <StudentCertificates /> },
-      { path: 'payments', element: <StudentPayments /> },
       { path: 'document-requests', element: <DocumentRequests /> },
       { path: 'scholarships', element: <Scholarships /> },
     ],
@@ -288,7 +285,19 @@ const router = createBrowserRouter([
     path: '/platform',
     element: <ProtectedRoute roles={['SUPER_ADMIN']}><DashboardLayout /></ProtectedRoute>,
     errorElement: <RouteError />,
-    children:[{index:true,element:<Organizations/>}],
+    children:[
+      {index:true,element:<SuperAdmin section="overview"/>},
+      {path:'organizations',element:<SuperAdmin section="organizations"/>},
+      {path:'subscriptions',element:<SuperAdmin section="subscriptions"/>},
+      {path:'users',element:<SuperAdmin section="users"/>},
+      {path:'plans',element:<SuperAdmin section="plans"/>},
+      {path:'system-health',element:<SuperAdmin section="health"/>},
+      {path:'security',element:<SuperAdmin section="security"/>},
+      {path:'audit',element:<SuperAdmin section="audit"/>},
+      {path:'notifications',element:<SuperAdmin section="notifications"/>},
+      {path:'support',element:<SuperAdmin section="support"/>},
+      {path:'settings',element:<SuperAdmin section="settings"/>},
+    ],
   },
   {
     path: '/admin',
@@ -304,7 +313,6 @@ const router = createBrowserRouter([
       { path: 'users', element: <UserManagement /> },
       { path: 'student-access-requests', element: <StudentAccessRequests /> },
       { path: 'course-oversight', element: <AdminCourseOversight /> },
-      { path: 'audit-log', element: <AdminAuditLog /> },
       { path: 'reports', element: <AdminReports /> },
       { path: 'billing', element: <AdminBilling /> },
       { path: 'system-health', element: <AdminSystemHealth /> },
@@ -348,7 +356,6 @@ const router = createBrowserRouter([
       },
       { path: 'schedules', element: <ScheduleOverview audience="organization" /> },
       { path: 'course-oversight', element: <AdminCourseOversight /> },
-      { path: 'audit-log', element: <AdminAuditLog /> },
       { path: 'document-requests', element: <DocumentRequests /> },
       { path: 'scholarships', element: <Scholarships /> },
     ],

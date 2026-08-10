@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Card from '../../components/ui/Card';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
-import { Users, UserCheck, UserPlus, BookOpen, BarChart3, Bell, Layers, CalendarCheck, Wallet, Receipt, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, UserPlus, BookOpen, BarChart3, Bell, Layers, CalendarCheck, AlertTriangle } from 'lucide-react';
 import { getAdminDashboardData } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import CalendarWithNotes from '../../components/dashboard/CalendarWithNotes';
@@ -54,14 +54,9 @@ export default function Admin() {
     { label: 'Нийт Хичээлүүд', value: dashboardData.stats.courses, icon: BookOpen },
   ];
 
-  const formatMoney = (amount, currency) =>
-    amount == null ? '—' : `${Math.round(amount).toLocaleString('mn-MN')} ${currency || ''}`.trim();
-
   const summaryStats = [
     { label: 'Идэвхтэй ангиуд', value: dashboardData.stats.activeCohorts, icon: Layers },
     { label: 'Ирцийн дундаж', value: dashboardData.stats.averageAttendancePct != null ? `${dashboardData.stats.averageAttendancePct}%` : '—', icon: CalendarCheck },
-    { label: 'Орлого', value: formatMoney(dashboardData.stats.revenue, dashboardData.stats.billingCurrency), icon: Wallet },
-    { label: 'Авлага', value: formatMoney(dashboardData.stats.receivable, dashboardData.stats.billingCurrency), icon: Receipt },
   ];
   const atRiskSummary = dashboardData.atRiskSummary || { total: 0, studentCount: 0, courseCount: 0, items: [] };
 
@@ -84,7 +79,7 @@ export default function Admin() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {summaryStats.map((item, index) => (
           <StatCard key={index} title={item.label} value={item.value} icon={item.icon} />
         ))}
@@ -203,14 +198,6 @@ export default function Admin() {
 
         <div className="space-y-6">
           <CalendarWithNotes />
-
-          <Card title="Сүүлийн системийн логууд">
-            <ul className="space-y-3">
-              {dashboardData.systemLogs.map((log, index) => (
-                <li key={index} className="rounded-3xl bg-white p-4 border border-slate-200 text-sm text-slate-600">{log.message}</li>
-              ))}
-            </ul>
-          </Card>
 
           <Card title="Системийн төлөв">
             <div className="space-y-3">

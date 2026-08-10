@@ -46,18 +46,18 @@ export function ConfirmProvider({ children }) {
             aria-labelledby="confirm-title"
             aria-describedby="confirm-message"
             tabIndex={-1}
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 outline-none dark:border-slate-700 dark:bg-slate-800"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 outline-none"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={18} aria-hidden className={request.tone === 'destructive' ? 'text-rose-500' : 'text-amber-500'} />
-                <h3 id="confirm-title" className="text-sm font-bold text-slate-900 dark:text-slate-100">{request.title}</h3>
+                <h3 id="confirm-title" className="text-sm font-bold text-slate-900">{request.title}</h3>
               </div>
-              <button onClick={() => settle(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Хаах">
+              <button onClick={() => settle(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Хаах">
                 <X size={16} aria-hidden />
               </button>
             </div>
-            <p id="confirm-message" className="mt-3 text-xs text-slate-600 dark:text-slate-300">{request.message}</p>
+            <p id="confirm-message" className="mt-3 text-xs text-slate-600">{request.message}</p>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 onClick={() => settle(false)}

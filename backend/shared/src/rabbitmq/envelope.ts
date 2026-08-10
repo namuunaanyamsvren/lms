@@ -71,6 +71,14 @@ export function createEventEnvelope(
 const withId = (field: string) => commonOrganization.extend({ [field]: z.string().min(1) });
 const eventContracts: Record<string, z.ZodTypeAny> = {
   'user.created': withId('userId').extend({ email: z.string().email(), role: z.string().min(1) }),
+  'guardian.invite.requested': withId('studentUserId').extend({
+    recipientEmail: z.string().email(),
+    studentName: z.string().min(1),
+    studentId: z.string().nullable().optional(),
+    guardianLinkCode: z.string().min(1),
+    registerUrl: z.string().url(),
+    loginUrl: z.string().url(),
+  }),
   'user.updated': withId('userId').extend({ email: z.string().email(), role: z.string().min(1) }),
   'user.deactivated': withId('userId').extend({ isActive: z.literal(false) }),
   'organization.created': withId('organizationId'),

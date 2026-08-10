@@ -18,7 +18,7 @@ import {
   startServiceRuntime,
 } from '@lms/shared';
 import routes from './routes';
-import { getRegistrationPolicy, getGradingPolicy, getAttendancePolicy } from './controllers/organization.controller';
+import { getRegistrationPolicy, getGradingPolicy, getAttendancePolicy, internalLifecycle } from './controllers/organization.controller';
 import { internalAuth } from './middleware/internalAuth';
 import { prisma } from './lib/prisma';
 
@@ -34,7 +34,9 @@ app.use(requestIdMiddleware);
 app.use(tracingMiddleware('organization-service'));
 app.use(requestLogger);
 applyCors(app);
-applyHttpSecurity(app);
+applyHttpSecurity(app, {
+  skipRateLimit: req => req.method === 'GET' && req.path === '/api/organizations/resolve',
+});
 app.use(express.json({ limit: '2mb' }));
 
 app.get(
@@ -55,7 +57,15 @@ app.get(
   requireInternalService('academic-service'),
   asyncHandler(getAttendancePolicy),
 );
+app.patch(
+  '/internal/organizations/:id/status',
+  internalAuth,
+  requireInternalService('billing-service'),
+  asyncHandler(internalLifecycle),
+);
+import superAdminRouter from './routes/super-admin.router';
 app.use('/api/organizations', routes);
+app.use('/api/super-admin', superAdminRouter);
 
 const runtimeDependencies = [redisDependency(false)];
 registerHealthRoutes(app, 'organization-service', runtimeDependencies);

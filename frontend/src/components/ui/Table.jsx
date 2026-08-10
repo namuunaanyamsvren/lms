@@ -1,12 +1,12 @@
 export default function Table({ columns = [], data = [], caption, className = '' }) {
   return (
-    <div className={`overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className}`}>
-      <table className="min-w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200">
+    <div className={`overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
+      <table className="min-w-full border-collapse text-left text-sm text-slate-700">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead className="bg-slate-50">
           <tr>
             {columns.map((column) => (
-              <th key={column.key} scope="col" className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-100">
+              <th key={column.key} scope="col" className="px-4 py-3 font-semibold text-slate-700">
                 {column.header}
               </th>
             ))}

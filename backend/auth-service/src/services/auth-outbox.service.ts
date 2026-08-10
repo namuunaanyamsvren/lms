@@ -40,6 +40,23 @@ export const enqueueUserInvited = (
     setPasswordUrl,
     occurredAt: new Date().toISOString(),
   });
+export const enqueueGuardianInviteRequested = (
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    studentUserId: string;
+    recipientEmail: string;
+    studentName: string;
+    studentId?: string | null;
+    guardianLinkCode: string;
+    registerUrl: string;
+    loginUrl: string;
+  },
+) =>
+  enqueueAuthEvent(tx, EVENTS.GUARDIAN_INVITE_REQUESTED, {
+    ...input,
+    occurredAt: new Date().toISOString(),
+  });
 export const enqueueUserAnonymized = (
   tx: Prisma.TransactionClient,
   input: { userId: string; organizationId: string },

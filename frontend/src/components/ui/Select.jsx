@@ -7,12 +7,12 @@ export default function Select({ label, error, options = [], className = '', id,
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {label && <label htmlFor={inputId} className="block text-sm font-medium text-slate-900 dark:text-slate-100">{label}</label>}
+      {label && <label htmlFor={inputId} className="block text-sm font-medium text-slate-900">{label}</label>}
       <select
         id={inputId}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={errorId}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
         {...props}
       >
         {options.map((option) => (

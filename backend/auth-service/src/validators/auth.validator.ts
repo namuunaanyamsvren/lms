@@ -15,7 +15,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  organizationId: z.string().default('org_main'),
+  organizationId: z.string().optional(),
   identifier: z.string().optional(),
   email: z.string().optional(),
   username: z.string().optional(),

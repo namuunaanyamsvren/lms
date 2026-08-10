@@ -150,17 +150,17 @@ export default function ActiveSessions({ onSessionTerminated }) {
   return (
     <section
       aria-labelledby="active-sessions-title"
-      className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800 sm:p-6"
+      className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3
             id="active-sessions-title"
-            className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+            className="text-lg font-semibold text-slate-900"
           >
             Идэвхтэй төхөөрөмжүүд
           </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-slate-500">
             Таны бүртгэлд нэвтэрсэн browser болон төхөөрөмжүүд.
           </p>
         </div>
@@ -172,7 +172,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
             setSuccess('');
             setConfirmation({ type: 'logout-all' });
           }}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogOut size={16} />
           Бүх төхөөрөмжөөс гарах
@@ -182,7 +182,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
       {error && (
         <div
           role="alert"
-          className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300"
+          className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700"
         >
           <AlertCircle size={18} className="mt-0.5 shrink-0" />
           <span className="flex-1">{error}</span>
@@ -201,7 +201,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
         <div
           role="status"
           aria-live="polite"
-          className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-300"
+          className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-700"
         >
           <CheckCircle2 size={18} /> {success}
         </div>
@@ -218,7 +218,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
         </div>
       ) : sessions.length === 0 && !error ? (
         <EmptyState
-          className="mt-5 dark:border-slate-700 dark:bg-slate-800"
+          className="mt-5"
           title="Идэвхтэй session алга"
           description="Таны бүртгэлд идэвхтэй төхөөрөмж бүртгэгдээгүй байна."
           icon={<ShieldOff size={26} />}
@@ -228,17 +228,17 @@ export default function ActiveSessions({ onSessionTerminated }) {
           {sessions.map(session => (
             <li
               key={session.id}
-              className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-4"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Laptop size={18} className="shrink-0 text-indigo-600" />
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                    <p className="font-semibold text-slate-900">
                       {session.deviceName}
                     </p>
                     {session.current && (
-                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">
+                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
                         Энэ төхөөрөмж
                       </span>
                     )}
@@ -248,7 +248,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 break-words text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 break-words text-sm text-slate-500">
                     {summarizeUserAgent(session.userAgent)}
                   </p>
                 </div>
@@ -257,7 +257,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
                   disabled={confirmationBusy || Boolean(session.revokedAt)}
                   onClick={() => requestRevoke(session)}
                   aria-label={`${session.deviceName} session-ийг цуцлах`}
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/30"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {session.current ? 'Энэ төхөөрөмжөөс гарах' : 'Session цуцлах'}
                 </button>
@@ -266,23 +266,23 @@ export default function ActiveSessions({ onSessionTerminated }) {
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">IP</dt>
-                  <dd className="mt-1 text-slate-700 dark:text-slate-300">{session.ipAddress}</dd>
+                  <dd className="mt-1 text-slate-700">{session.ipAddress}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Үүссэн</dt>
-                  <dd className="mt-1 text-slate-700 dark:text-slate-300">
+                  <dd className="mt-1 text-slate-700">
                     {safeDateTime(session.createdAt)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Сүүлд идэвхтэй</dt>
-                  <dd className="mt-1 text-slate-700 dark:text-slate-300">
+                  <dd className="mt-1 text-slate-700">
                     {session.lastUsedAt ? formatDate(session.lastUsedAt) : '—'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Дуусах хугацаа</dt>
-                  <dd className="mt-1 text-slate-700 dark:text-slate-300">
+                  <dd className="mt-1 text-slate-700">
                     {safeDateTime(session.expiresAt)}
                   </dd>
                 </div>
@@ -307,11 +307,11 @@ export default function ActiveSessions({ onSessionTerminated }) {
             aria-modal="true"
             aria-labelledby="session-dialog-title"
             aria-describedby="session-dialog-description"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-800"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
           >
             <h4
               id="session-dialog-title"
-              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+              className="text-lg font-semibold text-slate-900"
             >
               {confirmation.type === 'logout-all'
                 ? 'Бүх төхөөрөмжөөс гарах уу?'
@@ -321,7 +321,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
             </h4>
             <p
               id="session-dialog-description"
-              className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"
+              className="mt-2 text-sm leading-6 text-slate-600"
             >
               {confirmation.type === 'logout-all' || currentRevoke
                 ? 'Энэ үйлдлийн дараа таны одоогийн session хаагдаж, дахин нэвтрэх шаардлагатай.'
@@ -333,7 +333,7 @@ export default function ActiveSessions({ onSessionTerminated }) {
                 autoFocus
                 disabled={confirmationBusy}
                 onClick={() => setConfirmation(null)}
-                className="min-h-10 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="min-h-10 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50"
               >
                 Болих
               </button>

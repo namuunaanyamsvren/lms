@@ -1,0 +1,3 @@
+ALTER TABLE "StudentAccessRequest"
+  ADD COLUMN IF NOT EXISTS "requestedRole" TEXT NOT NULL DEFAULT 'STUDENT',
+  ADD COLUMN IF NOT EXISTS "guardianLinkCode" TEXT;

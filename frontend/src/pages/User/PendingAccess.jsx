@@ -9,11 +9,22 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { fetchMyMemberships, fetchMyStudentAccessRequests, fetchPublicOrganizations, requestStudentAccess } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
+const requestRoles = [
+  { value: 'STUDENT', label: 'Би сурагч', note: 'Сурагчийн dashboard нээгдэнэ.' },
+  { value: 'PARENT', label: 'Би эцэг эх / асран хамгаалагч', note: 'Эцэг эхийн dashboard нээгдэнэ.' },
+  { value: 'INSTRUCTOR', label: 'Би багш', note: 'Багшийн хэсэг нээгдэнэ.' },
+  { value: 'STAFF', label: 'Би ажилтан', note: 'Ажилтны хэсэг нээгдэнэ.' },
+];
+const roleLabels = Object.fromEntries(requestRoles.map(role => [role.value, role.label.replace('Би ', '')]));
+
 export default function PendingAccess() {
   const { user, refreshUser, getRoleRedirectPath, switchOrganization } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [search, setSearch] = useState('');
+  const [requestedRole, setRequestedRole] = useState('STUDENT');
+  const [guardianLinkCode, setGuardianLinkCode] = useState('');
+  const [note, setNote] = useState('');
   const [sentOrgIds, setSentOrgIds] = useState(() => new Set());
   const displayName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.email : 'Хэрэглэгч';
   const organizationsQuery = useQuery({
@@ -33,7 +44,9 @@ export default function PendingAccess() {
   const requestMutation = useMutation({
     mutationFn: (organization) => requestStudentAccess({
       organizationId: organization.id,
-      note: `${displayName} сурагчаар бүртгүүлэх хүсэлт илгээв.`,
+      requestedRole,
+      ...(requestedRole === 'PARENT' && guardianLinkCode.trim() ? { guardianLinkCode: guardianLinkCode.trim() } : {}),
+      note: note.trim() || `${displayName} ${roleLabels[requestedRole] || requestedRole} эрхээр холбогдох хүсэлт илгээв.`,
     }),
     onSuccess: (_, organization) => {
       setSentOrgIds((current) => new Set([...current, organization.id]));
@@ -44,7 +57,7 @@ export default function PendingAccess() {
       showToast(error?.response?.data?.message || 'Хүсэлт илгээхэд алдаа гарлаа.', 'error');
     },
   });
-  const approvedMemberships = (membershipsQuery.data || []).filter(membership => membership.role === 'STUDENT');
+  const approvedMemberships = (membershipsQuery.data || []).filter(membership => ['STUDENT', 'PARENT', 'INSTRUCTOR', 'STAFF'].includes(membership.role));
   const hasApprovedRequest = (requestsQuery.data || []).some((request) => request.status === 'APPROVED') || approvedMemberships.length > 0;
   const refreshAccessMutation = useMutation({
     mutationFn: async () => {
@@ -82,7 +95,7 @@ export default function PendingAccess() {
             <div>
               <p className="text-sm font-semibold text-slate-900">Эрх хүлээгдэж байна</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Нээлттэй бүртгэлээр сурагч dashboard автоматаар нээгдэхгүй.
+                Нээлттэй бүртгэлээр dashboard автоматаар нээгдэхгүй.
               </p>
             </div>
           </div>
@@ -96,7 +109,7 @@ export default function PendingAccess() {
             <div>
               <p className="text-sm font-semibold text-slate-900">Баталгаажуулалт</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Сонгосон сургуулийн менежер батлахад тухайн сургууль дээр сурагчийн membership үүснэ.
+                Сонгосон сургуулийн менежер батлахад тухайн сургууль дээр таны сонгосон role-ийн membership үүснэ.
               </p>
             </div>
           </div>
@@ -136,13 +149,13 @@ export default function PendingAccess() {
               disabled={refreshAccessMutation.isPending}
               className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
             >
-              {refreshAccessMutation.isPending ? 'Шинэчилж байна...' : 'Сурагчийн хэсэг рүү орох'}
+              {refreshAccessMutation.isPending ? 'Шинэчилж байна...' : 'Өөрийн хэсэг рүү орох'}
             </button>
           )}
         </div>
         {approvedMemberships.length > 0 && (
           <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-            {approvedMemberships.length} сургуулийн сурагчийн membership баталгаажсан байна.
+            {approvedMemberships.length} сургуулийн membership баталгаажсан байна.
           </div>
         )}
       </Card>
@@ -181,6 +194,47 @@ export default function PendingAccess() {
         <p className="mb-3 text-xs text-slate-500">
           Хүсэлт зөвхөн таны сонгосон сургуулийн менежерүүдэд очно.
         </p>
+        <div className="mb-4 grid gap-3 lg:grid-cols-4">
+          {requestRoles.map(role => (
+            <label
+              key={role.value}
+              className={`cursor-pointer rounded-2xl border p-3 text-sm transition ${requestedRole === role.value ? 'border-indigo-300 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
+            >
+              <input
+                type="radio"
+                name="requestedRole"
+                value={role.value}
+                checked={requestedRole === role.value}
+                onChange={() => setRequestedRole(role.value)}
+                className="sr-only"
+              />
+              <span className="block font-semibold">{role.label}</span>
+              <span className="mt-1 block text-xs text-slate-500">{role.note}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mb-4 grid gap-3 md:grid-cols-2">
+          {requestedRole === 'PARENT' && (
+            <label className="space-y-1 text-xs font-semibold text-slate-600">
+              <span>Хүүхдийн эцэг эхийн холбох код</span>
+              <input
+                value={guardianLinkCode}
+                onChange={(event) => setGuardianLinkCode(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+                placeholder="Жишээ: PARENT-0001"
+              />
+            </label>
+          )}
+          <label className="space-y-1 text-xs font-semibold text-slate-600">
+            <span>Нэмэлт тайлбар</span>
+            <input
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+              placeholder="Анги, хүүхдийн нэр, албан тушаал гэх мэт"
+            />
+          </label>
+        </div>
         <div className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
           <Search size={16} className="text-slate-400" />
           <input

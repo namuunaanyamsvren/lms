@@ -23,10 +23,10 @@ export default function CookieNotice() {
   return (
     <section
       aria-label="Cookie notice"
-      className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">
+        <p className="text-sm leading-6 text-slate-700">
           LMS нь нэвтрэх session, CSRF хамгаалалт зэрэг систем ажиллахад зайлшгүй
           cookie ашиглана. Одоогоор сурталчилгаа эсвэл analytics cookie ашиглахгүй.{' '}
           <a className="font-medium text-indigo-600 underline" href="/privacy#cookies">

@@ -12,7 +12,7 @@ const tabs = [
   ['gradeLevels', 'Анги / subject', GraduationCap], ['policies', 'Кредит бодлого', GraduationCap],
   ['campuses', 'Кампус / өрөө', MapPin], ['holidays', 'Амралтын өдөр', CalendarDays],
 ];
-const inputClass = 'w-full rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-900 px-3 py-2';
+const inputClass = 'w-full rounded-lg border border-slate-200 px-3 py-2';
 const isoDate = value => value ? new Date(value).toLocaleDateString('mn-MN') : '';
 
 export default function AcademicStructure() {
@@ -24,11 +24,13 @@ export default function AcademicStructure() {
   const online = useNetworkStatus();
   const { run, pending } = useAsyncAction();
   const confirm = useConfirm();
-  const load = () => { setError(null); return fetchAcademicStructure().then(setData).catch(setError); };
-  // Initial remote synchronization.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  const load = () => fetchAcademicStructure().then(setData).catch(setError);
   useEffect(() => {
-    load();
+    let ignore = false;
+    fetchAcademicStructure()
+      .then((res) => { if (!ignore) setData(res); })
+      .catch((err) => { if (!ignore) setError(err); });
+    return () => { ignore = true; };
   }, []);
   const actions = useMemo(() => ({
     years: () => setForm({ resource: 'years', name: '', startDate: '', endDate: '', status: 'PLANNED' }),
@@ -57,9 +59,9 @@ export default function AcademicStructure() {
     {!online && <OfflineBanner />}
     {error && <ErrorState error={error} onRetry={load}/>}
     {message && <div className="rounded-lg bg-emerald-50 text-emerald-700 px-4 py-3">{message}</div>}
-    <div className="flex gap-2 overflow-x-auto">{tabs.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`shrink-0 flex gap-2 items-center px-4 py-2 rounded-xl ${tab === id ? 'bg-indigo-600 text-white' : 'bg-white border dark:bg-slate-800'}`}><Icon size={16}/>{label}</button>)}</div>
+    <div className="flex gap-2 overflow-x-auto">{tabs.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`shrink-0 flex gap-2 items-center px-4 py-2 rounded-xl ${tab === id ? 'bg-indigo-600 text-white' : 'bg-white border'}`}><Icon size={16}/>{label}</button>)}</div>
     <div className="flex justify-end"><button className="btn-primary" onClick={actions[tab]}><Plus size={16}/>Нэмэх</button></div>
-    {form && <form onSubmit={save} className="bg-white dark:bg-slate-800 border rounded-xl p-5 grid md:grid-cols-3 gap-4">
+    {form && <form onSubmit={save} className="bg-white border rounded-xl p-5 grid md:grid-cols-3 gap-4">
       {Object.entries(form).filter(([key]) => key !== 'resource').map(([key, value]) => <label key={key} className="text-sm font-medium">{labelFor(key)}
         {key === 'status' ? <select className={inputClass} value={value} onChange={e => setForm({...form, [key]: e.target.value})}><option>PLANNED</option><option>ACTIVE</option><option>CLOSED</option></select>
           : typeof value === 'boolean' ? <input className="ml-3" type="checkbox" checked={value} onChange={e => setForm({...form, [key]: e.target.checked})}/>

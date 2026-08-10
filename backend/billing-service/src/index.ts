@@ -21,13 +21,13 @@ import {
 } from '@lms/shared';
 import routes from './routes';
 import { startOrganizationCreatedConsumer } from './events/organization-created.consumer';
-import { startEnrollmentCreatedConsumer } from './events/enrollment-created.consumer';
 import { startBillingOutboxPublisher } from './services/event-outbox.service';
 import { startBillingEventReconciliation } from './services/event-reconciliation.service';
 import { startBillingReminderScheduler } from './services/reminder-scheduler.service';
 import { deactivateOrganizationBilling, getAccessStatus, getRevenueSummary } from './controllers/internal.controller';
-import { handleQPayWebhook } from './controllers/billing.controller';
+import { handleQPayWebhook, handleStripeWebhook } from './controllers/billing.controller';
 import { validateQPayConfiguration } from './services/qpay-provider.service';
+import { validateStripeConfiguration } from './services/stripe-provider.service';
 import { prisma } from './lib/prisma';
 
 dotenv.config();
@@ -37,6 +37,7 @@ const logger = createLogger('billing-service');
 validateServiceEnvironment('billing');
 validateErrorMonitoringEnvironment();
 validateQPayConfiguration();
+validateStripeConfiguration();
 const PORT = process.env.PORT || 8004;
 
 app.use(requestIdMiddleware);
@@ -44,6 +45,7 @@ app.use(tracingMiddleware('billing-service'));
 app.use(requestLogger);
 applyCors(app);
 applyHttpSecurity(app);
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncHandler(handleStripeWebhook));
 app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/payments/qpay/webhook', asyncHandler(handleQPayWebhook));
@@ -85,7 +87,6 @@ startServiceRuntime({
   startWorkers: () => {
     Promise.all([
       startOrganizationCreatedConsumer(),
-      startEnrollmentCreatedConsumer(),
     ]).catch(error => {
       logger.error('Billing consumers failed to start', { error: String(error) });
     });

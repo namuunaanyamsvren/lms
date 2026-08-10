@@ -174,7 +174,9 @@ export default function Cohorts() {
 
   useEffect(() => {
     const cohortId = searchParams.get('cohortId');
-    if (cohortId) setSelectedCohortId(cohortId);
+    if (cohortId) {
+      queueMicrotask(() => setSelectedCohortId(cohortId));
+    }
   }, [searchParams]);
 
   const invalidateCohorts = () => queryClient.invalidateQueries({ queryKey: queryKeys.cohorts.all });

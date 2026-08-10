@@ -39,7 +39,7 @@ export default function HeroSection() {
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
                 <Link
                   to="/register"
-                  className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-7 py-3.5 text-sm font-semibold text-primary shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 hover:scale-105 active:scale-95"
+                  className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 hover:scale-105 active:scale-95"
                 >
                   Эхлэх
                 </Link>

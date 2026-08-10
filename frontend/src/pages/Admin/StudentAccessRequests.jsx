@@ -20,6 +20,12 @@ const statusTone = {
   REJECTED: 'bg-rose-50 text-rose-700',
   CANCELLED: 'bg-slate-100 text-slate-600',
 };
+const roleLabels = {
+  STUDENT: 'Сурагч',
+  PARENT: 'Эцэг эх',
+  INSTRUCTOR: 'Багш',
+  STAFF: 'Ажилтан',
+};
 
 export default function StudentAccessRequests() {
   const { showToast } = useToast();
@@ -30,7 +36,8 @@ export default function StudentAccessRequests() {
     queryKey: ['student-access-requests', status],
     queryFn: () => fetchStudentAccessRequests({ status }),
   });
-  const requests = requestsQuery.data?.items || [];
+  const rawRequests = requestsQuery.data?.items;
+  const requests = useMemo(() => rawRequests || [], [rawRequests]);
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return requests;
@@ -48,7 +55,7 @@ export default function StudentAccessRequests() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['student-access-requests'] });
-      showToast(variables.nextStatus === 'APPROVED' ? 'Сурагчийн эрх батлагдлаа.' : 'Хүсэлт татгалзлаа.', 'success');
+      showToast(variables.nextStatus === 'APPROVED' ? 'Эрхийн хүсэлт батлагдлаа.' : 'Хүсэлт татгалзлаа.', 'success');
     },
     onError: (error) => {
       showToast(error?.response?.data?.message || 'Хүсэлт шийдвэрлэхэд алдаа гарлаа.', 'error');
@@ -58,8 +65,8 @@ export default function StudentAccessRequests() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Сурагчийн эрхийн хүсэлтүүд"
-        subtitle="Энгийн хэрэглэгч сургуулиа сонгож илгээсэн хүсэлтийг эндээс батлах эсвэл татгалзана."
+        title="Эрхийн хүсэлтүүд"
+        subtitle="Энгийн хэрэглэгч сургуулиа болон хүссэн role-оо сонгож илгээсэн хүсэлтийг эндээс шийдвэрлэнэ."
       />
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -72,7 +79,7 @@ export default function StudentAccessRequests() {
         <Card title="Батлах үйлдэл">
           <div className="flex items-center gap-3">
             <UserCheck className="text-emerald-600" size={24} />
-            <p className="text-sm text-slate-600">Approve дарахад тухайн сургууль дээр сурагчийн membership үүснэ.</p>
+            <p className="text-sm text-slate-600">Approve дарахад тухайн сургууль дээр сонгосон role-ийн membership үүснэ.</p>
           </div>
         </Card>
         <Card title="Мэдэгдэл">
@@ -122,6 +129,7 @@ export default function StudentAccessRequests() {
               <thead>
                 <tr className="text-left text-xs uppercase text-slate-500">
                   <th className="px-3 py-3">Хэрэглэгч</th>
+                  <th className="px-3 py-3">Role</th>
                   <th className="px-3 py-3">Тайлбар</th>
                   <th className="px-3 py-3">Төлөв</th>
                   <th className="px-3 py-3">Огноо</th>
@@ -134,6 +142,14 @@ export default function StudentAccessRequests() {
                     <td className="px-3 py-3">
                       <p className="font-semibold text-slate-900">{request.requesterName || 'Нэргүй хэрэглэгч'}</p>
                       <p className="text-xs text-slate-500">{request.requesterEmail || request.requesterUserId}</p>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                        {roleLabels[request.requestedRole] || request.requestedRole || 'Сурагч'}
+                      </span>
+                      {request.guardianLinkCode && (
+                        <p className="mt-2 text-[11px] text-slate-500">Код: {request.guardianLinkCode}</p>
+                      )}
                     </td>
                     <td className="max-w-md px-3 py-3 text-slate-600">{request.note || '-'}</td>
                     <td className="px-3 py-3">

@@ -181,6 +181,8 @@ model StudentAccessRequest {
   requesterUserId         String
   requesterEmail          String?
   requesterName           String?
+  requestedRole           String                     @default("STUDENT")
+  guardianLinkCode        String?
   note                    String?
   status                  StudentAccessRequestStatus @default(PENDING)
   reviewedByUserId        String?
@@ -192,6 +194,26 @@ model StudentAccessRequest {
   @@unique([organizationId, requesterUserId])
   @@index([organizationId, status, createdAt])
   @@index([requesterOrganizationId, requesterUserId, status], map: "StudentAccessRequest_requesterOrganizationId_requesterUserId_st")
+}
+
+model SupportTicket {
+  id             String   @id @default(uuid())
+  organizationId String?
+  requesterUserId String?
+  requesterEmail String?
+  subject        String
+  description    String?
+  status         String   @default("OPEN")
+  priority       String   @default("NORMAL")
+  category       String?
+  assignedToUserId String?
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@index([status, priority, createdAt])
+  @@index([requesterUserId, createdAt])
 }
 
 // Notification-service's own audit trail for state-changing actions it owns

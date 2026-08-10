@@ -16,13 +16,14 @@ const demoTenant = {
   locale: 'mn-MN',
   allowRegister: true,
 };
+const loginResolvableStatuses = ['ACTIVE', 'TRIAL'] as const;
 
 export const resolveTenant = async (req: Request, res: Response) => {
   const key=normalizeHost(String(req.query.host||req.query.slug||''));
   if(!key)throw AppError.badRequest('host or slug is required');
   const baseDomain=normalizeHost(process.env.TENANT_BASE_DOMAIN||'localhost');
   const subdomain=key.endsWith(`.${baseDomain}`)?key.slice(0,-(baseDomain.length+1)):key;
-  const organization=await organizationPrisma.organization.findFirst({where:{deletedAt:null,status:'ACTIVE',OR:[{slug:subdomain},{domain:key,domainVerifiedAt:{not:null}}]},include:{settings:true}});
+  const organization=await organizationPrisma.organization.findFirst({where:{deletedAt:null,status:{in:[...loginResolvableStatuses]},OR:[{slug:subdomain},{domain:key,domainVerifiedAt:{not:null}}]},include:{settings:true}});
   if (!organization && subdomain === demoTenant.slug && process.env.ENABLE_DEMO_TENANT_FALLBACK === 'true') {
     return res.json({ success: true, data: demoTenant });
   }
@@ -34,6 +35,7 @@ export const platformDashboard=async(_req:Request,res:Response)=>{const [total,a
 export const platformList=async(req:Request,res:Response)=>{const page=Math.max(1,Number(req.query.page)||1),limit=Math.min(100,Math.max(1,Number(req.query.limit)||20));const search=String(req.query.search||'').trim(),status=req.query.status as any;const where:any={...(status?{status}:{}),...(search?{OR:[{name:{contains:search,mode:'insensitive'}},{slug:{contains:search,mode:'insensitive'}},{domain:{contains:search,mode:'insensitive'}}]}:{})};const [items,total]=await Promise.all([organizationPrisma.organization.findMany({where,include:{settings:true},orderBy:{createdAt:'desc'},skip:(page-1)*limit,take:limit}),organizationPrisma.organization.count({where})]);return res.json({success:true,data:{items,total,page,limit}});};
 export const publicList=async(req:Request,res:Response)=>{const search=String(req.query.search||'').trim();const where:any={status:'ACTIVE',deletedAt:null,...(search?{OR:[{name:{contains:search,mode:'insensitive'}},{slug:{contains:search,mode:'insensitive'}},{domain:{contains:search,mode:'insensitive'}}]}:{})};const items=await organizationPrisma.organization.findMany({where,select:{id:true,name:true,slug:true,domain:true,logoUrl:true},orderBy:{name:'asc'},take:50});return res.json({success:true,data:items});};
 export const platformLifecycle=async(req:Request,res:Response)=>{const status=req.body.status as 'ACTIVE'|'SUSPENDED'|'ARCHIVED';const row=await organizationPrisma.organization.findUnique({where:{id:req.params.id}});if(!row)throw AppError.notFound('Organization not found');const updated=await organizationPrisma.organization.update({where:{id:row.id},data:{status,deletedAt:status==='ARCHIVED'?new Date():null}});return res.json({success:true,data:updated});};
+export const internalLifecycle=async(req:Request,res:Response)=>{const status=req.body.status as 'ACTIVE'|'SUSPENDED'|'ARCHIVED';if(!['ACTIVE','SUSPENDED','ARCHIVED'].includes(status))throw AppError.badRequest('Invalid organization status');const row=await organizationPrisma.organization.findUnique({where:{id:req.params.id}});if(!row)throw AppError.notFound('Organization not found');const updated=await organizationPrisma.organization.update({where:{id:row.id},data:{status,deletedAt:status==='ARCHIVED'?new Date():null}});return res.json({success:true,data:updated});};
 
 export const requestDomainVerification=async(req:Request,res:Response)=>{const domain=normalizeHost(req.body.domain);const conflict=await organizationPrisma.organization.findFirst({where:{domain,NOT:{id:req.organizationId!}}});if(conflict)throw AppError.conflict('Domain is already in use');const token=`lms-domain-verification=${randomBytes(24).toString('hex')}`;await organizationPrisma.organization.update({where:{id:req.organizationId!},data:{domain,domainVerifiedAt:null,domainVerificationToken:token}});return res.json({success:true,data:{domain,recordType:'TXT',recordName:`_lms.${domain}`,recordValue:token}});};
 export const verifyDomain=async(req:Request,res:Response)=>{const org=await organizationPrisma.organization.findUnique({where:{id:req.organizationId!}});if(!org?.domain||!org.domainVerificationToken)throw AppError.badRequest('Domain verification has not been requested');const records=(await resolveTxt(`_lms.${org.domain}`).catch(()=>[])).map(parts=>parts.join(''));if(!records.includes(org.domainVerificationToken))throw AppError.badRequest('Verification TXT record was not found');const updated=await organizationPrisma.organization.update({where:{id:org.id},data:{domainVerifiedAt:new Date(),domainVerificationToken:null}});return res.json({success:true,data:{domain:updated.domain,verifiedAt:updated.domainVerifiedAt}});};
@@ -112,7 +114,7 @@ export const getRegistrationPolicy = async (req: Request, res: Response) => {
   return res.json({
     success: true,
     data: {
-      active: organization.status === 'ACTIVE',
+      active: loginResolvableStatuses.includes(organization.status as typeof loginResolvableStatuses[number]),
       allowRegister: organization.settings?.allowRegister ?? true,
       maxUsers: organization.settings?.maxUsers ?? 100,
       requireEmailVerification: organization.settings?.requireEmailVerification ?? false,

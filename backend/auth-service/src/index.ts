@@ -24,8 +24,10 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import { asyncHandler } from '@lms/shared';
 import {
+  activateOrganizationAdmins,
   provisionOrganizationAdmin,
   removeOrganizationAccounts,
+  revokeOrganizationSessions,
 } from './controllers/internal-organization.controller';
 import {
   listUserMemberships,
@@ -71,6 +73,18 @@ app.post(
   internalAuth,
   requireInternalService('organization-service'),
   asyncHandler(provisionOrganizationAdmin),
+);
+app.patch(
+  '/internal/organizations/:organizationId/admins/activate',
+  internalAuth,
+  requireInternalService('billing-service'),
+  asyncHandler(activateOrganizationAdmins),
+);
+app.post(
+  '/internal/organizations/:organizationId/revoke-sessions',
+  internalAuth,
+  requireInternalService('organization-service'),
+  asyncHandler(revokeOrganizationSessions),
 );
 app.delete(
   '/internal/organizations/:organizationId',

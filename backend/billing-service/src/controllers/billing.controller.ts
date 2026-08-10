@@ -1,13 +1,52 @@
 import { AppError, EVENTS, getPagination, paginatedData } from '@lms/shared';
 import { PaymentStatus, PlanType, Prisma } from '@prisma/client-billing';
+import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { enqueueBillingEvent } from '../services/event-outbox.service';
 import { createQPayProviderInvoice, verifyQPayWebhookSignature } from '../services/qpay-provider.service';
+import { createStripeCheckoutSession, verifyStripeWebhookSignature } from '../services/stripe-provider.service';
+import { activateOrganization, activateOrganizationAdmins } from '../services/organization-lifecycle.service';
 
 import { prisma } from '../lib/prisma';
+const onboardingPlans = {
+  monthly: {
+    plan: PlanType.BASIC,
+    amount: 99000,
+    currency: 'MNT',
+    billingCycle: 'monthly',
+    months: 1,
+    label: '1 сарын SaaS багц',
+  },
+  yearly: {
+    plan: PlanType.PRO,
+    amount: 990000,
+    currency: 'MNT',
+    billingCycle: 'yearly',
+    months: 12,
+    label: '1 жилийн SaaS багц',
+  },
+  four_year: {
+    plan: PlanType.ENTERPRISE,
+    amount: 2990000,
+    currency: 'MNT',
+    billingCycle: 'four_year',
+    months: 48,
+    label: '4 жилийн SaaS багц',
+  },
+} as const;
+const onboardingStripeSchema = z
+  .object({
+    organizationId: z.string().trim().min(1).max(200),
+    planKey: z.enum(['monthly', 'yearly', 'four_year']),
+    successUrl: z.string().url().max(2000),
+    cancelUrl: z.string().url().max(2000),
+    onboardingPaymentToken: z.string().trim().min(20).max(2000),
+  })
+  .strict();
 const subscriptionSchema = z
   .object({
+    organizationId: z.string().trim().min(1).max(200).optional(),
     plan: z.nativeEnum(PlanType),
     amount: z.number().nonnegative(),
     currency: z.string().trim().regex(/^[A-Z]{3}$/).default('MNT'),
@@ -18,6 +57,7 @@ const subscriptionSchema = z
   .strict();
 const invoiceSchema = z
   .object({
+    organizationId: z.string().trim().min(1).max(200).optional(),
     amount: z.number().positive(),
     currency: z.string().trim().regex(/^[A-Z]{3}$/).default('MNT'),
     studentId: z.string().trim().min(1).max(200).optional(),
@@ -56,16 +96,57 @@ const qpayWebhookSchema = z.object({
   amount: z.union([z.string(), z.number()]).optional(),
   currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
 }).passthrough();
+const stripeWebhookSchema = z.object({
+  id: z.string().optional(),
+  type: z.string(),
+  data: z.object({
+    object: z.record(z.any()),
+  }).passthrough(),
+}).passthrough();
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+const verifyOnboardingPaymentToken = (token: string, organizationId: string) => {
+  const secret = process.env.ONBOARDING_PAYMENT_TOKEN_SECRET || process.env.SERVICE_TOKEN_SECRET;
+  if (!secret) throw AppError.internal('Onboarding payment token configuration is missing');
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) throw AppError.unauthorized('Invalid onboarding payment token');
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  const provided = Buffer.from(signature);
+  const calculated = Buffer.from(expected);
+  if (provided.length !== calculated.length || !crypto.timingSafeEqual(provided, calculated)) {
+    throw AppError.unauthorized('Invalid onboarding payment token');
+  }
+  let data: { organizationId?: string; expiresAt?: number };
+  try {
+    data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      organizationId?: string;
+      expiresAt?: number;
+    };
+  } catch {
+    throw AppError.unauthorized('Invalid onboarding payment token');
+  }
+  if (data.organizationId !== organizationId || !data.expiresAt || data.expiresAt < Date.now()) {
+    throw AppError.unauthorized('Invalid onboarding payment token');
+  }
+};
+const targetOrganizationId = (req: Request, source: Record<string, unknown> = req.query) => {
+  const requested = typeof source.organizationId === 'string' ? source.organizationId.trim() : '';
+  if (req.user!.role === 'SUPER_ADMIN' && requested) return requested;
+  return req.organizationId!;
+};
+const invoiceActionWhere = (req: Request): Prisma.InvoiceWhereInput => ({
+  id: req.params.id,
+  ...(req.user!.role === 'SUPER_ADMIN' ? {} : { organizationId: req.organizationId! }),
+});
 export const isInvoiceTransitionAllowed = (from: PaymentStatus, to: PaymentStatus) =>
   (from === PaymentStatus.PENDING &&
     (to === PaymentStatus.COMPLETED || to === PaymentStatus.FAILED)) ||
   (from === PaymentStatus.COMPLETED && to === PaymentStatus.REFUNDED);
 
 export const getBillingOverview = async (req: Request, res: Response) => {
+  const organizationId = targetOrganizationId(req);
   const subscription = await prisma.subscription.findUnique({
-    where: { organizationId: req.organizationId! },
+    where: { organizationId },
     include: {
       invoices: {
         orderBy: { createdAt: 'desc' },
@@ -79,12 +160,12 @@ export const getBillingOverview = async (req: Request, res: Response) => {
 
 export const listInvoices = async (req: Request, res: Response) => {
   const pagination = getPagination(req, { defaultLimit: 20, maxLimit: 100 });
+  const organizationId = targetOrganizationId(req);
   const where: Prisma.InvoiceWhereInput = {
-    organizationId: req.organizationId!,
+    organizationId,
     ...(req.query.studentId ? { studentId: String(req.query.studentId) } : {}),
     ...(req.query.enrollmentId ? { enrollmentId: String(req.query.enrollmentId) } : {}),
     ...(req.query.status ? { status: req.query.status as PaymentStatus } : {}),
-    ...(req.user!.role === 'STUDENT' ? { studentId: req.user!.userId } : {}),
   };
   const [invoices, total] = await Promise.all([
     prisma.invoice.findMany({
@@ -101,9 +182,9 @@ export const listInvoices = async (req: Request, res: Response) => {
 
 export const listPayments = async (req: Request, res: Response) => {
   const pagination = getPagination(req, { defaultLimit: 20, maxLimit: 100 });
+  const organizationId = targetOrganizationId(req);
   const where: Prisma.PaymentWhereInput = {
-    organizationId: req.organizationId!,
-    ...(req.user!.role === 'STUDENT' ? { invoice: { studentId: req.user!.userId } } : {}),
+    organizationId,
   };
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({
@@ -120,7 +201,7 @@ export const listPayments = async (req: Request, res: Response) => {
 
 export const updateSubscription = async (req: Request, res: Response) => {
   const data = subscriptionSchema.parse(req.body);
-  const organizationId = req.organizationId!;
+  const organizationId = targetOrganizationId(req, data);
   const subscription = await prisma.$transaction(async (tx) => {
     const updated = await tx.subscription.upsert({
       where: { organizationId },
@@ -153,7 +234,7 @@ export const updateSubscription = async (req: Request, res: Response) => {
 
 export const issueInvoice = async (req: Request, res: Response) => {
   const data = invoiceSchema.parse(req.body);
-  const organizationId = req.organizationId!;
+  const organizationId = targetOrganizationId(req, data);
   const invoices = await prisma.$transaction(async (tx) => {
     const subscription = await tx.subscription.upsert({
       where: { organizationId },
@@ -211,9 +292,9 @@ const transitionInvoice = async (
   allowedFrom: PaymentStatus[],
   eventTypes: string[]
 ) => {
-  const organizationId = req.organizationId!;
-  const existing = await prisma.invoice.findFirst({ where: { id: req.params.id, organizationId } });
+  const existing = await prisma.invoice.findFirst({ where: invoiceActionWhere(req) });
   if (!existing) throw AppError.notFound('Invoice not found');
+  const organizationId = existing.organizationId;
   if (existing.status === targetStatus) return existing;
   if (!isInvoiceTransitionAllowed(existing.status, targetStatus)) {
     throw AppError.conflict(`Invoice cannot transition from ${existing.status} to ${targetStatus}`);
@@ -245,15 +326,11 @@ export const payInvoice = async (req: Request, res: Response) =>
   res.json({ success: true, data: await completeInvoicePayment(req) });
 
 export const createQPayInvoice = async (req: Request, res: Response) => {
-  const organizationId = req.organizationId!;
   const invoice = await prisma.invoice.findFirst({
-    where: {
-      id: req.params.id,
-      organizationId,
-      ...(req.user!.role === 'STUDENT' ? { studentId: req.user!.userId } : {}),
-    },
+    where: invoiceActionWhere(req),
   });
   if (!invoice) throw AppError.notFound('Invoice not found');
+  const organizationId = invoice.organizationId;
   if (invoice.status !== PaymentStatus.PENDING) {
     throw AppError.conflict(`Invoice cannot create QPay payment from ${invoice.status}`);
   }
@@ -281,6 +358,99 @@ export const createQPayInvoice = async (req: Request, res: Response) => {
     update: { qpayInvoiceUrl, providerPayload: toJson({ provider: 'QPAY', invoiceId: invoice.id, providerInvoiceId: providerInvoice.providerInvoiceId, raw: providerInvoice.raw }) },
   });
   return res.status(201).json({ success: true, data: { invoice, payment, qpayInvoiceUrl } });
+};
+
+export const createOnboardingStripeCheckout = async (req: Request, res: Response) => {
+  const input = onboardingStripeSchema.parse(req.body);
+  verifyOnboardingPaymentToken(input.onboardingPaymentToken, input.organizationId);
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw AppError.badRequest('Stripe тохиргоо хийгдээгүй байна. STRIPE_SECRET_KEY env утгаа тохируулна уу.', undefined, 'STRIPE_NOT_CONFIGURED');
+  }
+  const plan = onboardingPlans[input.planKey];
+  const amount = new Prisma.Decimal(plan.amount);
+  const currency = plan.currency;
+  const description = `LMS ${plan.label}`;
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.invoice.updateMany({
+      where: {
+        organizationId: input.organizationId,
+        status: PaymentStatus.PENDING,
+        payments: { none: { status: PaymentStatus.COMPLETED } },
+      },
+      data: { status: PaymentStatus.FAILED },
+    });
+    const subscription = await tx.subscription.upsert({
+      where: { organizationId: input.organizationId },
+      create: {
+        organizationId: input.organizationId,
+        plan: plan.plan,
+        amount,
+        currency,
+        billingCycle: plan.billingCycle,
+        isActive: false,
+        nextBillingAt: new Date(Date.now() + plan.months * 30 * 86_400_000),
+      },
+      update: {
+        plan: plan.plan,
+        amount,
+        currency,
+        billingCycle: plan.billingCycle,
+        isActive: false,
+        nextBillingAt: new Date(Date.now() + plan.months * 30 * 86_400_000),
+      },
+    });
+    const invoice = await tx.invoice.create({
+      data: {
+        organizationId: input.organizationId,
+        subscriptionId: subscription.id,
+        amount,
+        currency,
+        description,
+        dueDate: new Date(),
+      },
+    });
+    return { subscription, invoice };
+  });
+  const checkout = await createStripeCheckoutSession({
+    invoiceId: result.invoice.id,
+    organizationId: input.organizationId,
+    planKey: input.planKey,
+    amount: result.invoice.amount,
+    currency: result.invoice.currency,
+    description,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+  });
+  const payment = await prisma.payment.upsert({
+    where: {
+      organizationId_transactionId: {
+        organizationId: input.organizationId,
+        transactionId: `stripe:${checkout.providerSessionId}`,
+      },
+    },
+    create: {
+      organizationId: input.organizationId,
+      invoiceId: result.invoice.id,
+      amount: result.invoice.amount,
+      currency: result.invoice.currency,
+      method: 'STRIPE',
+      transactionId: `stripe:${checkout.providerSessionId}`,
+      status: PaymentStatus.PENDING,
+      providerPayload: toJson({ provider: 'STRIPE', sessionId: checkout.providerSessionId, planKey: input.planKey, raw: checkout.raw }),
+    },
+    update: {
+      providerPayload: toJson({ provider: 'STRIPE', sessionId: checkout.providerSessionId, planKey: input.planKey, raw: checkout.raw }),
+    },
+  });
+  return res.status(201).json({
+    success: true,
+    data: {
+      invoice: result.invoice,
+      payment,
+      checkoutUrl: checkout.checkoutUrl,
+      providerSessionId: checkout.providerSessionId,
+    },
+  });
 };
 
 export const handleQPayWebhook = async (req: Request, res: Response) => {
@@ -328,13 +498,68 @@ export const handleQPayWebhook = async (req: Request, res: Response) => {
   return res.json({ success: true, data: result });
 };
 
+export const handleStripeWebhook = async (req: Request, res: Response) => {
+  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body || {});
+  if (!verifyStripeWebhookSignature(rawBody, req.get('stripe-signature'))) {
+    throw AppError.unauthorized('Invalid Stripe webhook signature');
+  }
+  const event = stripeWebhookSchema.parse(JSON.parse(rawBody || '{}'));
+  if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed', 'checkout.session.expired'].includes(event.type)) {
+    return res.status(202).json({ success: true, data: { ignored: true, type: event.type } });
+  }
+  const session = event.data.object as Record<string, any>;
+  const invoiceId = String(session.metadata?.invoiceId || session.client_reference_id || '');
+  const providerSessionId = String(session.id || '');
+  if (!invoiceId || !providerSessionId) throw AppError.badRequest('Stripe webhook missing invoice reference');
+  const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+  if (!invoice) throw AppError.notFound('Invoice not found for Stripe webhook');
+
+  const paid = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded';
+  const transactionId = `stripe:${providerSessionId}`;
+  const result = paid
+    ? await completeInvoicePaymentById(invoice.organizationId, invoice.id, {
+        amount: invoice.amount,
+        currency: invoice.currency,
+        method: 'STRIPE',
+        transactionId,
+        providerPayload: toJson({ provider: 'STRIPE', webhook: event }),
+      })
+    : await markInvoiceFailedById(invoice.organizationId, invoice.id, transactionId, toJson(event));
+  if (paid) {
+    const payment = await prisma.payment.findFirst({ where: { organizationId: invoice.organizationId, transactionId } });
+    await prisma.subscription.updateMany({
+      where: { id: invoice.subscriptionId, organizationId: invoice.organizationId },
+      data: {
+        isActive: true,
+        status: String(session.subscription ? 'ACTIVE' : 'PAID'),
+        stripeCustomerId: session.customer ? String(session.customer) : undefined,
+        stripeSubscriptionId: session.subscription ? String(session.subscription) : undefined,
+        stripePriceId: session.metadata?.stripePriceId ? String(session.metadata.stripePriceId) : undefined,
+        currentPeriodEnd: session.expires_at ? new Date(Number(session.expires_at) * 1000) : invoice.dueDate,
+        paymentFailure: null,
+      },
+    });
+    await activateOrganization(invoice.organizationId);
+    await activateOrganizationAdmins(invoice.organizationId);
+    return res.json({ success: true, data: { result, payment } });
+  }
+  await prisma.subscription.updateMany({
+    where: { id: invoice.subscriptionId, organizationId: invoice.organizationId },
+    data: {
+      status: event.type === 'checkout.session.expired' ? 'EXPIRED' : 'PAYMENT_FAILED',
+      paymentFailure: event.type,
+      isActive: false,
+    },
+  });
+  return res.json({ success: true, data: result });
+};
+
 export const listOutstandingInvoices = async (req: Request, res: Response) => {
-  const organizationId = req.organizationId!;
+  const organizationId = targetOrganizationId(req);
   const now = new Date();
   const invoices = await prisma.invoice.findMany({
     where: {
       organizationId,
-      ...(req.user!.role === 'STUDENT' ? { studentId: req.user!.userId } : {}),
       status: PaymentStatus.PENDING,
       OR: [{ dueDate: null }, { dueDate: { lte: now } }],
     },
@@ -353,7 +578,7 @@ export const listOutstandingInvoices = async (req: Request, res: Response) => {
 };
 
 export const sendOutstandingReminders = async (req: Request, res: Response) => {
-  const organizationId = req.organizationId!;
+  const organizationId = targetOrganizationId(req);
   const invoices = await sendOutstandingReminderEvents(organizationId);
   return res.json({ success: true, data: { reminderCount: invoices.length } });
 };
@@ -401,15 +626,11 @@ export const refundInvoice = async (req: Request, res: Response) =>
   });
 
 const refundInvoicePayment = async (req: Request) => {
-  const organizationId = req.organizationId!;
   const existing = await prisma.invoice.findFirst({
-    where: {
-      id: req.params.id,
-      organizationId,
-      ...(req.user!.role === 'STUDENT' ? { studentId: req.user!.userId } : {}),
-    },
+    where: invoiceActionWhere(req),
   });
   if (!existing) throw AppError.notFound('Invoice not found');
+  const organizationId = existing.organizationId;
   if (existing.status === PaymentStatus.REFUNDED) return existing;
   if (existing.status !== PaymentStatus.COMPLETED) {
     throw AppError.conflict(`Invoice cannot transition from ${existing.status} to REFUNDED`);
@@ -448,16 +669,12 @@ const refundInvoicePayment = async (req: Request) => {
 };
 
 const completeInvoicePayment = async (req: Request) => {
-  const organizationId = req.organizationId!;
   const input = paymentSchema.parse(req.body || {});
   const existing = await prisma.invoice.findFirst({
-    where: {
-      id: req.params.id,
-      organizationId,
-      ...(req.user!.role === 'STUDENT' ? { studentId: req.user!.userId } : {}),
-    },
+    where: invoiceActionWhere(req),
   });
   if (!existing) throw AppError.notFound('Invoice not found');
+  const organizationId = existing.organizationId;
   if (
     existing.status !== PaymentStatus.PENDING &&
     existing.status !== PaymentStatus.COMPLETED

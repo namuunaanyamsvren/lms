@@ -13,6 +13,7 @@ import {
   createUser,
   updateUserAdmin,
   deactivateUserAdmin,
+  sendGuardianInviteEmail,
   downloadUserCsvTemplate,
   importUsersCsv,
   exportUsersCsv,
@@ -30,6 +31,8 @@ import {
   Pencil,
   Ban,
   CheckCircle2,
+  Clipboard,
+  Mail,
   UserX,
 } from 'lucide-react';
 
@@ -68,6 +71,8 @@ export default function UserManagement() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
+  const [guardianInviteUser, setGuardianInviteUser] = useState(null);
+  const [guardianInviteEmail, setGuardianInviteEmail] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [importErrors, setImportErrors] = useState(null);
   const [importSummary, setImportSummary] = useState(null);
@@ -96,6 +101,9 @@ export default function UserManagement() {
     onSuccess: invalidateUsers,
   });
   const deactivateMutation = useMutation({ mutationFn: deactivateUserAdmin, onSuccess: invalidateUsers });
+  const guardianEmailMutation = useMutation({
+    mutationFn: ({ id, email }) => sendGuardianInviteEmail(id, email),
+  });
 
   const createForm = useForm({ defaultValues: emptyCreateForm });
   const editForm = useForm({ defaultValues: emptyCreateForm });
@@ -216,6 +224,46 @@ export default function UserManagement() {
     }
   };
 
+  const guardianInviteText = (student) => {
+    const name = [student.lastName, student.firstName].filter(Boolean).join(' ') || student.email;
+    return [
+      `Сайн байна уу. ${name} сурагчийн EduPulse LMS эцэг эхийн эрхтэй холбогдох урилга.`,
+      '',
+      `1. ${window.location.origin}/register дээр бүртгүүлнэ эсвэл /login дээр нэвтэрнэ.`,
+      '2. Сургуультай холбогдох хэсгээс "Би эцэг эх / асран хамгаалагч" сонгоно.',
+      `3. Эцэг эх холбох код дээр: ${student.guardianLinkCode}`,
+      '',
+      'Сургуулийн менежер баталсны дараа эцэг эхийн dashboard нээгдэнэ.',
+    ].join('\n');
+  };
+
+  const copyText = async (text, successMessage = 'Хуулагдлаа.') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(successMessage, 'success');
+    } catch {
+      showToast('Clipboard-д хуулахад алдаа гарлаа.', 'error');
+    }
+  };
+
+  const openGuardianInvite = (student) => {
+    setGuardianInviteUser(student);
+    setGuardianInviteEmail('');
+  };
+
+  const sendGuardianEmail = async () => {
+    if (!guardianInviteUser) return;
+    try {
+      await guardianEmailMutation.mutateAsync({
+        id: guardianInviteUser.id,
+        email: guardianInviteEmail,
+      });
+      showToast('Эцэг эхийн код email-р илгээгдлээ.', 'success');
+    } catch (err) {
+      showToast(err?.response?.data?.message || 'Email илгээхэд алдаа гарлаа', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -320,7 +368,16 @@ export default function UserManagement() {
                     <td className="px-4 py-3 text-slate-500">
                       <div>{u.studentId || u.employeeId || '-'}</div>
                       {u.role === 'STUDENT' && u.guardianLinkCode && (
-                        <div className="mt-1 text-[10px] text-slate-400">Эцэг эхийн код: {u.guardianLinkCode}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+                          <span>Эцэг эхийн код: {u.guardianLinkCode}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyText(u.guardianLinkCode, 'Эцэг эхийн код хуулагдлаа.')}
+                            className="rounded-lg border border-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
+                          >
+                            Хуулах
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -335,6 +392,13 @@ export default function UserManagement() {
                           title="Засах"
                           className="rounded-xl border border-slate-200 p-1.5 hover:bg-slate-100"
                         ><Pencil size={14} /></button>
+                        {u.role === 'STUDENT' && u.guardianLinkCode && (
+                          <button
+                            onClick={() => openGuardianInvite(u)}
+                            title="Эцэг эх урих"
+                            className="rounded-xl border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
+                          ><Mail size={14} /></button>
+                        )}
                         {u.status === 'SUSPENDED' ? (
                           <button
                             onClick={() => toggleStatus(u, 'ACTIVE')}
@@ -478,6 +542,63 @@ export default function UserManagement() {
                 <button type="submit" disabled={editForm.formState.isSubmitting} className="rounded-2xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-md transition disabled:opacity-50">Хадгалах</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {guardianInviteUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-base font-bold text-slate-900">Эцэг эхэд илгээх урилга</h3>
+              <button onClick={() => setGuardianInviteUser(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+            </div>
+            <div className="mt-4 space-y-4 text-xs">
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-indigo-800">
+                <p className="font-semibold">Холбох код: {guardianInviteUser.guardianLinkCode}</p>
+                <p className="mt-1 text-indigo-700">Энэ кодыг эцэг эхийн Gmail/email рүү илгээж болно.</p>
+              </div>
+              <div>
+                <label className="mb-1 block font-semibold text-slate-700">Эцэг эхийн email</label>
+                <input
+                  value={guardianInviteEmail}
+                  onChange={(event) => setGuardianInviteEmail(event.target.value)}
+                  type="email"
+                  placeholder="parent@gmail.com"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <textarea
+                readOnly
+                value={guardianInviteText(guardianInviteUser)}
+                rows={8}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 outline-none"
+              />
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => copyText(guardianInviteUser.guardianLinkCode, 'Код хуулагдлаа.')}
+                  className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Clipboard size={14} /> Код хуулах
+                </button>
+                <button
+                  type="button"
+                  onClick={sendGuardianEmail}
+                  disabled={!guardianInviteEmail.trim() || guardianEmailMutation.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Mail size={14} /> {guardianEmailMutation.isPending ? 'Илгээж байна...' : 'Email илгээх'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText(guardianInviteText(guardianInviteUser), 'Урилгын текст хуулагдлаа.')}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  <Clipboard size={14} /> Урилга хуулах
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

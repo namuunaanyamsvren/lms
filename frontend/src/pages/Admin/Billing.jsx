@@ -8,16 +8,19 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { queryKeys } from '../../services/queryKeys';
 import {
+  fetchPlatformOrganizations,
   fetchBillingOverview,
   fetchInvoices,
   fetchPaymentHistory,
   updateSubscription,
   issueInvoice,
   payInvoice,
+  createQPayInvoice,
   failInvoice,
   refundInvoice,
 } from '../../services/api';
-import { CreditCard, Plus, Check, X, RotateCcw } from 'lucide-react';
+import { CreditCard, Plus, Check, X, RotateCcw, ExternalLink } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const PLAN_LABELS = { FREE: 'Free', BASIC: 'Basic', PRO: 'Pro', ENTERPRISE: 'Enterprise' };
 const STATUS_TONE = {
@@ -30,31 +33,44 @@ const formatMoney = (amount, currency) => `${Number(amount).toLocaleString('mn-M
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('mn-MN', { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 
 export default function Billing() {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('invoices');
   const [planOpen, setPlanOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
-  const overviewQuery = useQuery({ queryKey: queryKeys.billing.overview, queryFn: fetchBillingOverview });
-  const invoicesQuery = useQuery({ queryKey: queryKeys.billing.invoices, queryFn: fetchInvoices, enabled: tab === 'invoices' });
-  const paymentsQuery = useQuery({ queryKey: queryKeys.billing.payments, queryFn: fetchPaymentHistory, enabled: tab === 'payments' });
+  const organizationsQuery = useQuery({
+    queryKey: ['platform-organizations', 'billing'],
+    queryFn: () => fetchPlatformOrganizations({ status: 'ACTIVE', limit: 100 }),
+    enabled: isSuperAdmin,
+  });
+  const organizations = organizationsQuery.data?.items || [];
+  const activeOrganizationId = isSuperAdmin ? (selectedOrganizationId || organizations[0]?.id || user?.organizationId) : user?.organizationId;
+  const activeBillingParams = isSuperAdmin && activeOrganizationId ? { organizationId: activeOrganizationId } : {};
+
+  const overviewQuery = useQuery({ queryKey: [...queryKeys.billing.overview, activeOrganizationId], queryFn: () => fetchBillingOverview(activeBillingParams), enabled: !isSuperAdmin || Boolean(activeOrganizationId) });
+  const invoicesQuery = useQuery({ queryKey: [...queryKeys.billing.invoices, activeOrganizationId], queryFn: () => fetchInvoices(activeBillingParams), enabled: tab === 'invoices' && (!isSuperAdmin || Boolean(activeOrganizationId)) });
+  const paymentsQuery = useQuery({ queryKey: [...queryKeys.billing.payments, activeOrganizationId], queryFn: () => fetchPaymentHistory(activeBillingParams), enabled: tab === 'payments' && (!isSuperAdmin || Boolean(activeOrganizationId)) });
 
   const invalidateBilling = () => queryClient.invalidateQueries({ queryKey: ['billing'] });
 
   const planForm = useForm({ defaultValues: { plan: 'BASIC', amount: 0, currency: 'MNT', billingCycle: 'monthly' } });
-  const issueForm = useForm({ defaultValues: { amount: 0, currency: 'MNT' } });
+  const issueForm = useForm({ defaultValues: { amount: 0, currency: 'MNT', description: 'Байгууллагын LMS SaaS ашиглалтын төлбөр' } });
 
   const planMutation = useMutation({ mutationFn: updateSubscription, onSuccess: invalidateBilling });
   const issueMutation = useMutation({ mutationFn: issueInvoice, onSuccess: invalidateBilling });
   const payMutation = useMutation({ mutationFn: (id) => payInvoice(id), onSuccess: invalidateBilling });
+  const qpayMutation = useMutation({ mutationFn: createQPayInvoice, onSuccess: invalidateBilling });
   const failMutation = useMutation({ mutationFn: failInvoice, onSuccess: invalidateBilling });
   const refundMutation = useMutation({ mutationFn: refundInvoice, onSuccess: invalidateBilling });
 
   const onPlanSubmit = planForm.handleSubmit(async (values) => {
     try {
-      await planMutation.mutateAsync({ ...values, amount: Number(values.amount) });
+      await planMutation.mutateAsync({ ...values, ...activeBillingParams, amount: Number(values.amount) });
       setPlanOpen(false);
       showToast('Багц шинэчлэгдлээ.', 'success');
     } catch (err) {
@@ -64,9 +80,9 @@ export default function Billing() {
 
   const onIssueSubmit = issueForm.handleSubmit(async (values) => {
     try {
-      await issueMutation.mutateAsync({ ...values, amount: Number(values.amount) });
+      await issueMutation.mutateAsync({ ...values, ...activeBillingParams, amount: Number(values.amount) });
       setIssueOpen(false);
-      issueForm.reset({ amount: 0, currency: 'MNT' });
+      issueForm.reset({ amount: 0, currency: 'MNT', description: 'Байгууллагын LMS SaaS ашиглалтын төлбөр' });
       showToast('Нэхэмжлэх үүслээ.', 'success');
     } catch (err) {
       showToast(err?.response?.data?.message || 'Нэхэмжлэх үүсгэхэд алдаа гарлаа', 'error');
@@ -79,6 +95,17 @@ export default function Billing() {
       showToast('Нэхэмжлэх төлөгдсөнөөр тэмдэглэгдлээ.', 'success');
     } catch (err) {
       showToast(err?.response?.data?.message || 'Алдаа гарлаа', 'error');
+    }
+  };
+
+  const handleQPay = async (id) => {
+    try {
+      const response = await qpayMutation.mutateAsync(id);
+      const url = response?.data?.qpayInvoiceUrl;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      showToast('QPay нэхэмжлэх үүслээ.', 'success');
+    } catch (err) {
+      showToast(err?.response?.data?.message || 'QPay нэхэмжлэх үүсгэхэд алдаа гарлаа', 'error');
     }
   };
 
@@ -111,13 +138,32 @@ export default function Billing() {
         subtitle="Байгууллагын багц, нэхэмжлэх, төлбөрийн түүх."
         right={
           <div className="flex gap-2">
-            <button onClick={() => setPlanOpen(true)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50">Багц өөрчлөх</button>
-            <button onClick={() => setIssueOpen(true)} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700">
-              <Plus size={15} />Нэхэмжлэх үүсгэх
-            </button>
+            {isSuperAdmin && (
+              <>
+                <button onClick={() => setPlanOpen(true)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50">Багц өөрчлөх</button>
+                <button onClick={() => setIssueOpen(true)} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700">
+                  <Plus size={15} />Нэхэмжлэх үүсгэх
+                </button>
+              </>
+            )}
           </div>
         }
       />
+
+      {isSuperAdmin && (
+        <Card>
+          <label className="block text-xs font-semibold text-slate-600">Сургууль / байгууллага</label>
+          <select
+            value={activeOrganizationId || ''}
+            onChange={(event) => setSelectedOrganizationId(event.target.value)}
+            className="mt-2 w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+          >
+            {organizations.map((organization) => (
+              <option key={organization.id} value={organization.id}>{organization.name} · {organization.slug}</option>
+            ))}
+          </select>
+        </Card>
+      )}
 
       {overviewQuery.isLoading ? (
         <div className="flex min-h-[20vh] items-center justify-center"><LoadingSpinner /></div>
@@ -159,11 +205,12 @@ export default function Billing() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <tr><th className="px-4 py-3">Дүн</th><th className="px-4 py-3">Төлөв</th><th className="px-4 py-3">Үүссэн</th><th className="px-4 py-3 text-right">Үйлдэл</th></tr>
+                  <tr><th className="px-4 py-3">Тайлбар</th><th className="px-4 py-3">Дүн</th><th className="px-4 py-3">Төлөв</th><th className="px-4 py-3">Үүссэн</th><th className="px-4 py-3 text-right">Үйлдэл</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {invoicesQuery.data.map((inv) => (
                     <tr key={inv.id} className="hover:bg-slate-50/80">
+                      <td className="px-4 py-3 text-slate-700">{inv.description || 'Байгууллагын LMS SaaS ашиглалтын төлбөр'}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{formatMoney(inv.amount, inv.currency)}</td>
                       <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUS_TONE[inv.status] || 'bg-slate-100'}`}>{inv.status}</span></td>
                       <td className="px-4 py-3 text-slate-500">{formatDate(inv.createdAt)}</td>
@@ -171,11 +218,16 @@ export default function Billing() {
                         <div className="flex justify-end gap-1.5">
                           {inv.status === 'PENDING' && (
                             <>
-                              <button onClick={() => handlePay(inv.id)} title="Төлөгдсөн" className="rounded-xl border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"><Check size={14} /></button>
-                              <button onClick={() => handleFail(inv.id)} title="Амжилтгүй" className="rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"><X size={14} /></button>
+                              <button onClick={() => handleQPay(inv.id)} title="QPay төлөх" className="rounded-xl border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"><ExternalLink size={14} /></button>
+                              {isSuperAdmin && (
+                                <>
+                                  <button onClick={() => handlePay(inv.id)} title="Төлөгдсөн" className="rounded-xl border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"><Check size={14} /></button>
+                                  <button onClick={() => handleFail(inv.id)} title="Амжилтгүй" className="rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"><X size={14} /></button>
+                                </>
+                              )}
                             </>
                           )}
-                          {inv.status === 'COMPLETED' && (
+                          {isSuperAdmin && inv.status === 'COMPLETED' && (
                             <button onClick={() => handleRefund(inv.id)} title="Буцаах" className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-100"><RotateCcw size={14} /></button>
                           )}
                         </div>
@@ -250,6 +302,10 @@ export default function Billing() {
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Дүн *</label>
                 <input type="number" min="1" {...issueForm.register('amount', { required: true })} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs" />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Тайлбар</label>
+                <input {...issueForm.register('description')} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs" />
               </div>
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setIssueOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">Цуцлах</button>

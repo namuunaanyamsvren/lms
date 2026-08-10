@@ -62,6 +62,7 @@ const notification = new NotificationPrismaClient(clientOptions(databaseUrls.not
 const FIXED_NOW = new Date('2026-07-30T00:00:00.000Z');
 const ids = Object.freeze({
   organization: 'org_main',
+  superAdmin: 'usr_super_admin_1',
   admin: 'usr_admin_1',
   teacher: 'usr_teacher_1',
   student: 'usr_student_1',
@@ -99,6 +100,10 @@ const ids = Object.freeze({
 });
 
 const users = [
+  {
+    id: ids.superAdmin, email: 'superadmin@lms.mn', username: 'superadmin', phone: '99000001',
+    firstName: 'Platform', lastName: 'Admin', role: 'SUPER_ADMIN',
+  },
   {
     id: ids.admin, email: 'admin@lms.mn', username: 'admin', phone: '99112233',
     firstName: 'Бат-Эрдэнэ', lastName: 'Ганболд', role: 'ORG_ADMIN',

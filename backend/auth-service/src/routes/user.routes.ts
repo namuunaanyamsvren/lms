@@ -11,6 +11,7 @@ import {
   getUserCsvTemplate,
   getUsers,
   importUsers,
+  sendGuardianInviteEmail,
   updateMe,
   updateUser,
 } from '../controllers/user.controller';
@@ -27,12 +28,13 @@ router.get('/import/template', writeRoles, asyncHandler(getUserCsvTemplate));
 router.post('/import', writeRoles, asyncHandler(importUsers));
 router.patch('/me', asyncHandler(updateMe));
 router.get('/me/memberships', asyncHandler(getMyMemberships));
+router.post('/:id/guardian-invite-email', writeRoles, validateUserId, asyncHandler(sendGuardianInviteEmail));
 router.patch('/:id', writeRoles, validateUserId, asyncHandler(updateUser));
 router.delete('/:id', writeRoles, validateUserId, asyncHandler(deactivateUser));
 router.get('/:id', readRoles, validateUserId, asyncHandler(getUserById));
 
 function validateUserId(req: Request, _res: Response, next: NextFunction) {
-  const result = z.string().uuid().safeParse(req.params.id);
+  const result = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).safeParse(req.params.id);
   if (!result.success) return next(AppError.badRequest('Invalid user id'));
   next();
 }

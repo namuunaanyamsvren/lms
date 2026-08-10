@@ -26,6 +26,7 @@ import { startUserUpdatedConsumer } from './events/user-updated.consumer';
 import { startEmailVerificationConsumer } from './events/email-verification.consumer';
 import { startPasswordResetConsumer } from './events/password-reset.consumer';
 import { startUserInvitedConsumer } from './events/user-invited.consumer';
+import { startGuardianInviteConsumer } from './events/guardian-invite.consumer';
 import { startOrganizationCreatedConsumer } from './events/organization-created.consumer';
 import { validateEmailProviderConfiguration } from './services/email.service';
 import { validateSmsProviderConfiguration } from './services/channel-provider.service';
@@ -100,6 +101,7 @@ startServiceRuntime({
       startEmailVerificationConsumer(),
       startPasswordResetConsumer(),
       startUserInvitedConsumer(),
+      startGuardianInviteConsumer(),
       startOrganizationCreatedConsumer(),
       startUserAnonymizedConsumer(),
       startScheduleConsumers(),

@@ -19,11 +19,11 @@ export default function Modal({ open, title, children, footer, onClose, classNam
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
         tabIndex={-1}
-        className={`w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl outline-none dark:bg-slate-800 ${className}`}
+        className={`w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl outline-none ${className}`}
       >
         <div className="mb-5 flex items-center justify-between">
-          {title && <h2 id="modal-title" className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h2>}
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-700" aria-label="Хаах">
+          {title && <h2 id="modal-title" className="text-xl font-semibold text-slate-900">{title}</h2>}
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800" aria-label="Хаах">
             <X size={18} aria-hidden />
           </button>
         </div>

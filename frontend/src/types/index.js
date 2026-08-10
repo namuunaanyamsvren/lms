@@ -5,12 +5,6 @@ export const NotificationTypes = {
   ERROR: 'error',
 };
 
-export const ThemeModes = {
-  SYSTEM: 'system',
-  LIGHT: 'light',
-  DARK: 'dark',
-};
-
 export const UserRoles = {
   STUDENT: 'STUDENT',
   INSTRUCTOR: 'INSTRUCTOR',

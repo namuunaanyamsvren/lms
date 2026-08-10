@@ -389,6 +389,12 @@ export const updateUserAdmin = (id, payload) =>
 export const deactivateUserAdmin = (id) =>
   fetchWithAuth(`${BASE_API_URL}/users/${id}`, { method: 'DELETE' });
 
+export const sendGuardianInviteEmail = (id, email) =>
+  fetchWithAuth(`${BASE_API_URL}/users/${id}/guardian-invite-email`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
 export const fetchStudentAccessRequests = async (params = {}) => {
   const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null));
   const data = await fetchWithAuth(`${BASE_API_URL}/notifications/student-access-requests?${query}`);
@@ -608,9 +614,24 @@ export const onboardOrganization = async (payload) => {
   });
   return data.data;
 };
-export const fetchPlatformOrganizations=async(params={})=>{const q=new URLSearchParams(Object.entries(params).filter(([,v])=>v!==''&&v!=null));const d=await fetchWithAuth(`${BASE_API_URL}/organizations/platform?${q}`);return d.data;};
-export const fetchPlatformDashboard=async()=>{const d=await fetchWithAuth(`${BASE_API_URL}/organizations/platform/dashboard`);return d.data;};
-export const updateOrganizationLifecycle=(id,status)=>fetchWithAuth(`${BASE_API_URL}/organizations/platform/${id}/status`,{method:'PATCH',body:JSON.stringify({status})});
+export const createOnboardingStripeCheckout = async (payload) => {
+  const data = await authRequest({
+    url: '/payments/onboarding/stripe-checkout',
+    method: 'POST',
+    data: payload,
+  });
+  return data.data;
+};
+const platformQuery = params => new URLSearchParams(Object.entries(params || {}).filter(([, v]) => v !== '' && v != null)).toString();
+export const fetchSuperAdminOverview=async()=>{const d=await fetchWithAuth(`${BASE_API_URL}/super-admin/overview`);return d.data;};
+export const fetchSuperAdminList=async(resource,params={})=>{const q=platformQuery(params);const d=await fetchWithAuth(`${BASE_API_URL}/super-admin/${resource}${q?`?${q}`:''}`);return d.data;};
+export const fetchSuperAdminOrganization=async(id)=>{const d=await fetchWithAuth(`${BASE_API_URL}/super-admin/organizations/${id}`);return d.data;};
+export const updateSuperAdminOrganizationStatus=(id,payload)=>fetchWithAuth(`${BASE_API_URL}/super-admin/organizations/${id}/status`,{method:'PATCH',body:JSON.stringify(payload)});
+export const createSuperAdminPlan=(payload)=>fetchWithAuth(`${BASE_API_URL}/super-admin/plans`,{method:'POST',body:JSON.stringify(payload)});
+export const updateSuperAdminPlan=(id,payload)=>fetchWithAuth(`${BASE_API_URL}/super-admin/plans/${id}`,{method:'PATCH',body:JSON.stringify(payload)});
+export const fetchPlatformOrganizations=async(params={})=>fetchSuperAdminList('organizations',params);
+export const fetchPlatformDashboard=async()=>{const d=await fetchSuperAdminOverview();return {total:d.organizations?.total||0,active:d.organizations?.active||0,suspended:d.organizations?.suspended||0,archived:d.organizations?.canceled||0};};
+export const updateOrganizationLifecycle=(id,status)=>updateSuperAdminOrganizationStatus(id,{status:status==='ARCHIVED'?'CANCELED':status,reason:'Lifecycle update from platform organizations page'});
 export const requestDomainVerification=domain=>fetchWithAuth(`${BASE_API_URL}/organizations/current/domain-verification`,{method:'POST',body:JSON.stringify({domain})});
 export const verifyOrganizationDomain=()=>fetchWithAuth(`${BASE_API_URL}/organizations/current/domain-verification/verify`,{method:'POST',body:'{}'});
 
@@ -708,18 +729,21 @@ export const updateReportSchedule = (id, payload) =>
 export const deleteReportSchedule = (id) =>
   fetchWithAuth(`${BASE_API_URL}/reports/schedules/${id}`, { method: 'DELETE' });
 
-export const fetchBillingOverview = async () => {
-  const data = await fetchWithAuth(`${BASE_API_URL}/payments`);
+export const fetchBillingOverview = async (params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null));
+  const data = await fetchWithAuth(`${BASE_API_URL}/payments${query.size ? `?${query}` : ''}`);
   return data.data;
 };
 
-export const fetchInvoices = async () => {
-  const data = await fetchWithAuth(`${BASE_API_URL}/payments/invoices`);
+export const fetchInvoices = async (params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null));
+  const data = await fetchWithAuth(`${BASE_API_URL}/payments/invoices${query.size ? `?${query}` : ''}`);
   return data.success ? data.data : [];
 };
 
-export const fetchPaymentHistory = async () => {
-  const data = await fetchWithAuth(`${BASE_API_URL}/payments/history`);
+export const fetchPaymentHistory = async (params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null));
+  const data = await fetchWithAuth(`${BASE_API_URL}/payments/history${query.size ? `?${query}` : ''}`);
   return data.success ? data.data : [];
 };
 

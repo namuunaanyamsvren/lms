@@ -1,10 +1,49 @@
 import { Request, Response } from 'express';
+import { AppError } from '@lms/shared';
 
 import { prisma } from '../lib/prisma';
 
 export const provisionOrganization = async (req: Request, res: Response) => {
+  const requestedId = String(req.body.id || '');
+  const requestedSlug = String(req.body.slug || '');
+  const data = {
+    organizationId: requestedId,
+    name: req.body.name,
+    slug: requestedSlug,
+    domain: req.body.domain,
+    logoUrl: req.body.logoUrl,
+    deletedAt: null,
+  };
+
+  const existingById = await prisma.organization.findUnique({ where: { id: requestedId } });
+  if (existingById) {
+    if (existingById.slug !== requestedSlug) {
+      const slugConflict = await prisma.organization.findUnique({ where: { slug: requestedSlug } });
+      if (slugConflict && slugConflict.id !== requestedId) {
+        throw AppError.conflict('Organization slug is already provisioned');
+      }
+    }
+    const organization = await prisma.organization.update({
+      where: { id: requestedId },
+      data,
+    });
+    return res.status(201).json({ success: true, data: organization });
+  }
+
+  const existingBySlug = await prisma.organization.findUnique({ where: { slug: requestedSlug } });
+  if (existingBySlug) {
+    if (!existingBySlug.deletedAt) {
+      throw AppError.conflict('Organization slug is already provisioned');
+    }
+    const organization = await prisma.organization.update({
+      where: { id: existingBySlug.id },
+      data: { id: requestedId, ...data },
+    });
+    return res.status(201).json({ success: true, data: organization });
+  }
+
   const organization = await prisma.organization.create({
-    data: { ...req.body, organizationId: req.body.id },
+    data: { id: requestedId, ...data },
   });
   return res.status(201).json({ success: true, data: organization });
 };

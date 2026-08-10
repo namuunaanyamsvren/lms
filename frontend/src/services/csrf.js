@@ -25,8 +25,10 @@ export const ensureCsrfToken = async (forceRefresh = false) => {
     credentials: 'include',
   });
   if (!response.ok) throw new Error('CSRF token авахад алдаа гарлаа.');
-  const data = await response.json().catch(() => ({}));
-  const token = getCsrfToken() || data?.data?.token;
+  const data = typeof response.json === 'function'
+    ? await response.json().catch(() => ({}))
+    : {};
+  const token = getCsrfToken() || data?.data?.token || data?.token;
   if (!token) throw new Error('CSRF cookie тохируулагдсангүй.');
   cachedCsrfToken = token;
   return token;

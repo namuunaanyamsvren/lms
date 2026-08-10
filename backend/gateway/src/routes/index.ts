@@ -18,6 +18,7 @@ const routes: Array<{
   target: string;
   pathRewrite?: Record<string, string>;
 }> = [
+  { path: '/api/v1/super-admin', target: config.services.organization },
   { path: '/api/v1/auth', target: config.services.auth },
   { path: '/api/v1/organizations', target: config.services.organization },
   // Identity/user records are owned by auth-service.

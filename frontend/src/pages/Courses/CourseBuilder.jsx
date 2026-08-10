@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Copy, GitCompare, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import {
@@ -16,10 +16,10 @@ export default function CourseBuilder() {
   const [notice, setNotice] = useState('');
   const [versionCompare, setVersionCompare] = useState(null);
   const confirm = useConfirm();
-  const load = () => fetchCourseById(id).then(value => { setCourse(value); setSavedSnapshot(JSON.stringify(value)); });
+  const load = useCallback(() => fetchCourseById(id).then(value => { setCourse(value); setSavedSnapshot(JSON.stringify(value)); }), [id]);
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
   useUnsavedChanges(Boolean(course && savedSnapshot && JSON.stringify(course) !== savedSnapshot));
   const run = async (action, message = 'Хадгаллаа') => { await action(); setNotice(message); await load(); };
   const saveCourse = async () => {
@@ -47,9 +47,9 @@ export default function CourseBuilder() {
   return <div className="course-builder max-w-6xl mx-auto space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><Link to="/teacher/courses" className="text-sm text-indigo-600">← Хичээлүүд</Link><h1 className="text-2xl font-bold mt-1">Course builder</h1><p className="mt-1 text-sm text-slate-500">Published болгох бүрт version snapshot үүсэж, cohort тухайн үеийн хувилбарыг хадгална.</p></div><div className="flex gap-2"><button onClick={() => { const code = prompt('Шинэ course code'); if (code) run(() => duplicateCourse(id, { code }), 'Хуулбар үүслээ'); }} className="btn"><Copy size={16} />Хуулах</button><button onClick={saveCourse} className="btn-primary"><Save size={16} />Хадгалах</button></div></div>
     {notice && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg">{notice}</div>}
-    {course.versions?.length > 0 && <section className="rounded-xl border bg-white p-4 text-sm text-slate-600 dark:bg-slate-800">
+    {course.versions?.length > 0 && <section className="rounded-xl border bg-white p-4 text-sm text-slate-600">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><b className="text-slate-900 dark:text-white">Published versions:</b> {course.versions.map(version => `v${version.version}`).join(', ')}</div>
+        <div><b className="text-slate-900">Published versions:</b> {course.versions.map(version => `v${version.version}`).join(', ')}</div>
         <div className="flex flex-wrap gap-2">
           {course.versions.length >= 2 && <button className="btn" onClick={async () => setVersionCompare(await compareCourseVersions(id, course.versions[1].version, course.versions[0].version))}><GitCompare size={15} />Сүүлийн 2-г харьцуулах</button>}
           <button className="btn" onClick={async () => { const version = course.versions[0].version; if (await confirm(`v${version} хувилбараас draft сэргээх үү?`)) run(() => restoreCourseVersion(id, version), `v${version} хувилбараас сэргээв`); }}><RotateCcw size={15} />Сүүлийн хувилбараас сэргээх</button>
@@ -63,7 +63,7 @@ export default function CourseBuilder() {
         {(versionCompare.summary.removedModules || []).length > 0 && <p>Хасагдсан: {versionCompare.summary.removedModules.join(', ')}</p>}
       </div>}
     </section>}
-    <section className="bg-white dark:bg-slate-800 border rounded-xl p-5 grid md:grid-cols-2 gap-4">
+    <section className="bg-white border rounded-xl p-5 grid md:grid-cols-2 gap-4">
       <label>Код<input value={course.code} onChange={e => setCourse({ ...course, code: e.target.value })} /></label>
       <label>Нэр<input value={course.title} onChange={e => setCourse({ ...course, title: e.target.value })} /></label>
       <label>Кредит<input type="number" value={course.credits} onChange={e => setCourse({ ...course, credits: e.target.value })} /></label>
@@ -82,7 +82,7 @@ export default function CourseBuilder() {
       <label>Шаардлагатай хувь<input type="number" min="1" max="100" value={course.completionPercentage} onChange={e => setCourse({ ...course, completionPercentage: e.target.value })} /></label>
     </section>
     <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Модуль ба lesson</h2><button className="btn-primary" onClick={() => { const title = prompt('Модулийн нэр'); if (title) run(() => createModule(id, { title })); }}><Plus size={16} />Модуль</button></div>
-    {course.modules.map((module, moduleIndex) => <section key={module.id} className="bg-white dark:bg-slate-800 border rounded-xl overflow-hidden">
+    {course.modules.map((module, moduleIndex) => <section key={module.id} className="bg-white border rounded-xl overflow-hidden">
       <div className="p-4 border-b flex items-center gap-2"><input className="font-semibold flex-1" value={module.title} onChange={e => setCourse({ ...course, modules: course.modules.map(m => m.id === module.id ? { ...m, title: e.target.value } : m) })} onBlur={() => run(() => updateModule(module.id, { title: module.title }))} />
         <button onClick={() => shift(course.modules, moduleIndex, -1, ids => reorderModules(id, ids))}><ArrowUp size={17} /></button><button onClick={() => shift(course.modules, moduleIndex, 1, ids => reorderModules(id, ids))}><ArrowDown size={17} /></button><button onClick={async () => { if (await confirm('Модулийг устгах уу?')) run(() => deleteModule(module.id)); }}><Trash2 size={17} /></button></div>
       <div className="p-4 space-y-3">{module.lessons.map((lesson, lessonIndex) => <LessonEditor key={lesson.id} lesson={lesson} onSave={payload => run(() => updateLesson(lesson.id, payload))} onDelete={async () => { if (await confirm('Lesson устгах уу?')) run(() => deleteLesson(lesson.id)); }} onMove={direction => shift(module.lessons, lessonIndex, direction, ids => reorderLessons(module.id, ids))} />)}

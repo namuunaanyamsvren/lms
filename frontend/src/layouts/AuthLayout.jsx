@@ -12,28 +12,13 @@ export default function AuthLayout({ children }) {
       </main>
 
       {/* Right Side */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-950 text-white">
-        {/* Background Image */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1600&auto=format&fit=crop')",
-          }}
-        />
-
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-slate-950/65" />
-        <div className="absolute -right-32 bottom-[-8rem] h-96 w-96 rounded-full bg-secondary/45 blur-3xl" />
-        <div className="absolute left-[-10rem] top-[-8rem] h-80 w-80 rounded-full bg-primary/35 blur-3xl" />
-
-        {/* Content */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-l border-slate-200 bg-white">
         <div className="relative z-10 flex flex-col justify-center px-12 lg:px-16">
-          <h1 className="mb-8 text-4xl font-extrabold tracking-normal text-white">
+          <h1 className="mb-8 text-4xl font-extrabold tracking-normal text-slate-950">
             EduPulse LMS
           </h1>
 
-          <h2 className="mb-6 text-5xl font-black tracking-normal leading-[1.15] text-white drop-shadow-sm">
+          <h2 className="mb-6 text-5xl font-black tracking-normal leading-[1.15] text-slate-950">
             Суралц.
             <br />
             Хөгж.
@@ -41,7 +26,7 @@ export default function AuthLayout({ children }) {
             Амжилтад хүр.
           </h2>
 
-          <p className="max-w-lg text-lg font-normal leading-8 text-white">
+          <p className="max-w-lg text-lg font-normal leading-8 text-slate-600">
             Их дээд сургууль, коллеж, сургуулиудад зориулсан орчин үеийн сургалтын удирдлагын систем. Хичээл, даалгавар, дүн болон харилцааг нэг платформоос удирдах боломж.
           </p>
         </div>

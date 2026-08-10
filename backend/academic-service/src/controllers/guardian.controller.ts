@@ -96,6 +96,54 @@ export const createGuardianLink = async (req: Request, res: Response) => {
   return res.status(201).json({ success: true, data: link });
 };
 
+export const createApprovedGuardianLinkInternal = async (req: Request, res: Response) => {
+  const organizationId = String(req.body.organizationId || '').trim();
+  const parentUserId = String(req.body.parentUserId || '').trim();
+  const guardianLinkCode = String(req.body.guardianLinkCode || '').trim();
+  const approvedById = req.body.approvedById ? String(req.body.approvedById).trim() : null;
+  if (!organizationId || !parentUserId || !guardianLinkCode) {
+    throw AppError.badRequest('organizationId, parentUserId and guardianLinkCode are required');
+  }
+
+  const [parent, student] = await Promise.all([
+    prisma.user.findFirst({
+      where: { organizationId, id: parentUserId, deletedAt: null },
+      select: { id: true },
+    }),
+    prisma.user.findFirst({
+      where: { organizationId, role: 'STUDENT', guardianLinkCode, deletedAt: null },
+      select: { id: true },
+    }),
+  ]);
+  if (!parent) throw AppError.notFound('Parent user not found');
+  if (!student) throw AppError.notFound('Student/link code not found');
+
+  const link = await prisma.guardian.upsert({
+    where: {
+      organizationId_parentUserId_studentUserId: {
+        organizationId,
+        parentUserId,
+        studentUserId: student.id,
+      },
+    },
+    create: {
+      organizationId,
+      parentUserId,
+      studentUserId: student.id,
+      status: 'APPROVED',
+      invitedById: approvedById || parentUserId,
+      respondedAt: new Date(),
+    },
+    update: {
+      status: 'APPROVED',
+      respondedAt: new Date(),
+      invitedById: approvedById || undefined,
+    },
+    select: guardianSelect,
+  });
+  return res.status(201).json({ success: true, data: link });
+};
+
 const findGuardianLink = async (req: Request) => {
   const link = await prisma.guardian.findFirst({
     where: { id: req.params.id, organizationId: org(req) },

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   enqueueUserCreated,
   enqueueUserDeactivated,
+  enqueueGuardianInviteRequested,
   enqueueUserInvited,
   enqueueUserUpdated,
 } from '../services/auth-outbox.service';
@@ -253,6 +254,11 @@ const buildSetPasswordUrl = (rawToken: string) => {
   return `${frontendUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
 };
 
+const buildAuthUrl = (path: string) => {
+  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return `${frontendUrl}${path}`;
+};
+
 async function createInvitedUser(
   organizationId: string,
   invitedById: string,
@@ -323,6 +329,49 @@ export const createUser = async (req: Request, res: Response) => {
     success: true,
     data: Object.fromEntries(Object.entries(user).filter(([key]) => key !== 'passwordHash')),
   });
+};
+
+const guardianInviteEmailSchema = z
+  .object({
+    email: z.string().trim().email(),
+  })
+  .strict();
+
+export const sendGuardianInviteEmail = async (req: Request, res: Response) => {
+  const input = guardianInviteEmailSchema.parse(req.body);
+  const student = await prisma.userAccount.findFirst({
+    where: {
+      id: req.params.id,
+      organizationId: req.organizationId!,
+      role: 'STUDENT',
+      deletedAt: null,
+    },
+    select: {
+      firstName: true,
+      lastName: true,
+      email: true,
+      studentId: true,
+      guardianLinkCode: true,
+    },
+  });
+  if (!student) throw AppError.notFound('Student not found');
+  if (!student.guardianLinkCode) throw AppError.badRequest('Эцэг эх холбох код бүртгэгдээгүй байна.');
+
+  const studentName = [student.lastName, student.firstName].filter(Boolean).join(' ') || student.email;
+  await prisma.$transaction(async tx => {
+    await enqueueGuardianInviteRequested(tx, {
+      organizationId: req.organizationId!,
+      studentUserId: req.params.id,
+      recipientEmail: input.email,
+      studentName,
+      studentId: student.studentId,
+      guardianLinkCode: student.guardianLinkCode!,
+      registerUrl: buildAuthUrl('/register'),
+      loginUrl: buildAuthUrl('/login'),
+    });
+  });
+
+  return res.json({ success: true, data: { email: input.email } });
 };
 
 const updateMeSchema = z

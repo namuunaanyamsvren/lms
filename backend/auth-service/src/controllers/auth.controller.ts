@@ -315,8 +315,10 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const context = getSessionRequestContext(req);
+    const normalizedTargetKey = normalizeLoginIdentifier(targetKey);
+    const loginScope = organizationId || 'global';
     const attemptKeys = loginProtection.keys(
-      organizationId,
+      loginScope,
       targetKey,
       context.ipAddress,
     );
@@ -327,12 +329,8 @@ export const login = async (req: Request, res: Response) => {
         message: genericLoginError,
       });
     }
-    const normalizedTargetKey = normalizeLoginIdentifier(targetKey);
-
-    // Find user by organizationId AND (email OR username OR phone)
-    const user = await prisma.userAccount.findFirst({
-      where: {
-        organizationId,
+    const userWhere = {
+      ...(organizationId ? { organizationId } : {}),
         deletedAt: null,
         OR: [
           { email: targetKey },
@@ -340,21 +338,46 @@ export const login = async (req: Request, res: Response) => {
           { username: targetKey },
           { phone: targetKey },
         ],
-      },
+    };
+
+    const candidates = await prisma.userAccount.findMany({
+      where: userWhere,
+      take: organizationId ? 1 : 20,
     });
 
-    const isMatch = await bcrypt.compare(
-      normalizePassword(password),
-      user?.passwordHash || await dummyPasswordHash,
+    const normalizedPassword = normalizePassword(password);
+    if (candidates.length === 0) {
+      await bcrypt.compare(normalizedPassword, await dummyPasswordHash);
+    }
+
+    const passwordChecks = await Promise.all(
+      candidates.map(async candidate => ({
+        user: candidate,
+        matches: await bcrypt.compare(normalizedPassword, candidate.passwordHash),
+      })),
     );
+    const matchingUsers = passwordChecks
+      .filter(result => result.matches && result.user.isActive)
+      .map(result => result.user);
+
+    if (!organizationId && matchingUsers.length > 1) {
+      await loginProtection.recordFailure(attemptKeys);
+      return res.status(401).json({
+        success: false,
+        message: 'Энэ имэйл/утас олон байгууллагад ижил нууц үгтэй байна. Google эсвэл байгууллагын тусгай холбоосоор нэвтэрнэ үү.',
+      });
+    }
+
+    const user = matchingUsers[0] || candidates[0] || null;
+    const isMatch = matchingUsers.length === 1;
     if (!user || !user.isActive || !isMatch) {
       const failure = await loginProtection.recordFailure(attemptKeys);
-      await recordLoginFailure(prisma, organizationId, context, user?.id);
+      await recordLoginFailure(prisma, user?.organizationId || organizationId || 'unknown', context, user?.id);
       if (failure.newlyLocked) {
         await recordAuthAudit(prisma, {
           eventType: AuthAuditEventType.ACCOUNT_LOCKED,
           userId: user?.id,
-          organizationId,
+          organizationId: user?.organizationId || organizationId || 'unknown',
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
           deviceName: context.deviceName,

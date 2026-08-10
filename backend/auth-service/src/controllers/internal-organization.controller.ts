@@ -21,12 +21,57 @@ export const provisionOrganizationAdmin = async (req: Request, res: Response) =>
       firstName: req.body.firstName,
       lastName: req.body.lastName,
       role: 'ORG_ADMIN',
-      isActive: true,
+      isActive: req.body.isActive === false ? false : true,
     }});
     await enqueueUserCreated(tx, created);
     return created;
   });
   return res.status(201).json({ success: true, data: user });
+};
+
+export const activateOrganizationAdmins = async (req: Request, res: Response) => {
+  const organizationId = req.params.organizationId;
+  const result = await prisma.userAccount.updateMany({
+    where: {
+      organizationId,
+      role: 'ORG_ADMIN',
+      deletedAt: null,
+    },
+    data: { isActive: true },
+  });
+  return res.json({ success: true, data: { activated: result.count } });
+};
+
+export const revokeOrganizationSessions = async (req: Request, res: Response) => {
+  const organizationId = req.params.organizationId;
+  const reason = typeof req.body?.reason === 'string' && req.body.reason.trim()
+    ? req.body.reason.trim().slice(0, 500)
+    : 'ORGANIZATION_STATUS_REVOKE';
+  const now = new Date();
+  const userIds = (await prisma.userAccount.findMany({
+    where: { organizationId, deletedAt: null },
+    select: { id: true },
+  })).map(user => user.id);
+  if (userIds.length === 0) {
+    return res.json({ success: true, data: { sessionsRevoked: 0, refreshTokensRevoked: 0 } });
+  }
+  const [sessions, refreshTokens] = await prisma.$transaction([
+    prisma.session.updateMany({
+      where: { userId: { in: userIds }, revokedAt: null },
+      data: { revokedAt: now, revokeReason: reason },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { organizationId, revoked: false },
+      data: { revoked: true, revokedAt: now },
+    }),
+  ]);
+  return res.json({
+    success: true,
+    data: {
+      sessionsRevoked: sessions.count,
+      refreshTokensRevoked: refreshTokens.count,
+    },
+  });
 };
 
 export const removeOrganizationAccounts = async (req: Request, res: Response) => {

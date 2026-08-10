@@ -23,7 +23,7 @@ export default function Sidebar({ isOpen }) {
 
   return (
     <aside
-      className={`h-full border-r border-slate-200/80 bg-white shadow-xs transition-all duration-300 ${
+      className={`h-full border-r border-slate-200/80 bg-white text-slate-700 shadow-xs transition-all duration-300 ${
         isOpen ? 'w-64' : 'w-20'
       } overflow-hidden`}
       aria-label="Үндсэн цэс"
@@ -59,7 +59,7 @@ export default function Sidebar({ isOpen }) {
                     title={item.label}
                     className={`group relative flex w-full items-center rounded-xl text-sm font-medium transition-all ${
                       isOpen ? 'justify-between px-3 py-2.5' : 'justify-center px-0 py-3'
-                    } ${isExpanded ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-100 hover:text-primary'}`}
+                    } ${isExpanded ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-primary'}`}
                   >
                     <div className={`flex items-center ${isOpen ? 'gap-3' : 'justify-center'}`}>
                       <Icon size={19} className={isExpanded ? 'text-primary' : 'text-slate-500'} />
@@ -97,7 +97,7 @@ export default function Sidebar({ isOpen }) {
                       <Link
                         key={subindex}
                         to={subitem.href}
-                        className="block px-3 py-2 text-xs font-medium text-slate-600 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                        className="block px-3 py-2 text-xs font-medium text-slate-600 hover:bg-primary/5 hover:text-primary rounded-xl transition-colors"
                       >
                         {subitem.label}
                       </Link>

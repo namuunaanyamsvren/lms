@@ -12,6 +12,14 @@ import { invalidateUnread, notificationEventSchema, notificationPrisma, unreadCo
 import { deliverNotification } from '../services/notification.service';
 import { recordAuditLog, recordCentralAuditLog } from '../services/audit.service';
 import { approveStudentMembership } from '../services/auth-membership.service';
+import { createApprovedGuardianLink } from '../services/academic-guardian.service';
+
+const accessRoleLabels: Record<string, string> = {
+  STUDENT: 'Сурагч',
+  PARENT: 'Эцэг эх / асран хамгаалагч',
+  INSTRUCTOR: 'Багш',
+  STAFF: 'Ажилтан',
+};
 
 export const getNotifications = async (req: Request, res: Response) => {
   const unread = req.query.unread === 'true' ? false : undefined;
@@ -58,6 +66,11 @@ export const queueBulkNotifications=async(req:Request,res:Response)=>{
 
 export const requestStudentAccess = async (req: Request, res: Response) => {
   const organizationId = req.body.organizationId || req.organizationId!;
+  const requestedRole = req.body.requestedRole || 'STUDENT';
+  const guardianLinkCode = requestedRole === 'PARENT' ? req.body.guardianLinkCode || undefined : undefined;
+  if (requestedRole === 'PARENT' && !guardianLinkCode) {
+    throw AppError.badRequest('Эцэг эхийн хүсэлтэд хүүхдийн холбох код шаардлагатай.');
+  }
   const requester = await notificationPrisma.notificationRecipient.findUnique({
     where: { organizationId_userId: { organizationId: req.organizationId!, userId: req.user!.userId } },
   });
@@ -70,12 +83,16 @@ export const requestStudentAccess = async (req: Request, res: Response) => {
       requesterUserId: req.user!.userId,
       requesterEmail: requester?.email || undefined,
       requesterName,
+      requestedRole,
+      guardianLinkCode,
       note: req.body.note || undefined,
     },
     update: {
       requesterOrganizationId: req.organizationId!,
       requesterEmail: requester?.email || undefined,
       requesterName,
+      requestedRole,
+      guardianLinkCode,
       note: req.body.note || undefined,
       ...(req.body.force === true ? { status: StudentAccessRequestStatus.PENDING, reviewedByUserId: null, reviewerNote: null, reviewedAt: null } : {}),
     },
@@ -90,14 +107,16 @@ export const requestStudentAccess = async (req: Request, res: Response) => {
   if (managers.length === 0) {
     return res.status(409).json({ success: false, message: 'Энэ сургуульд хүсэлт хүлээн авах менежер олдсонгүй.', data: accessRequest });
   }
+  const roleLabel = accessRoleLabels[requestedRole] || requestedRole;
+  const guardianNote = guardianLinkCode ? `\nХүүхдийн холбох код: ${guardianLinkCode}` : '';
   const note = req.body.note ? `\n\nТайлбар: ${req.body.note}` : '';
   await Promise.all(managers.map(manager => deliverNotification({
     organizationId,
     userId: manager.userId,
     eventType: 'STUDENT_ACCESS_REQUEST',
     idempotencyKey: `student-access-request:${accessRequest.id}:${manager.userId}`,
-    title: 'Сурагчаар бүртгүүлэх хүсэлт',
-    body: `${requesterName} сурагчийн dashboard ашиглах эрх хүсэж байна.${note}\n\nХүсэлтийн самбар: /admin/student-access-requests`,
+    title: `${roleLabel} эрхийн хүсэлт`,
+    body: `${requesterName} "${roleLabel}" эрхээр холбогдох хүсэлт илгээв.${guardianNote}${note}\n\nХүсэлтийн самбар: /admin/student-access-requests`,
     channels: ['IN_APP'],
     recipientEmail: manager.email || undefined,
     variables: {
@@ -105,6 +124,8 @@ export const requestStudentAccess = async (req: Request, res: Response) => {
       requesterUserId: req.user!.userId,
       requesterEmail: requester?.email || '',
       requesterName,
+      requestedRole,
+      guardianLinkCode: guardianLinkCode || '',
       actionUrl: '/admin/student-access-requests',
       targetType: 'studentAccessRequest',
       targetId: accessRequest.id,
@@ -154,11 +175,23 @@ export const reviewStudentAccessRequest = async (req: Request, res: Response) =>
   }
   const status = req.body.status as StudentAccessRequestStatus;
   if (status === StudentAccessRequestStatus.APPROVED) {
+    if (request.requestedRole === 'PARENT' && !request.guardianLinkCode) {
+      throw AppError.badRequest('Эцэг эхийн хүсэлтийг батлахын тулд хүүхдийн холбох код шаардлагатай.');
+    }
     await approveStudentMembership({
       organizationId: request.organizationId,
       userId: request.requesterUserId,
       approvedById: req.user!.userId,
+      role: request.requestedRole || 'STUDENT',
     });
+    if (request.requestedRole === 'PARENT' && request.guardianLinkCode) {
+      await createApprovedGuardianLink({
+        organizationId: request.organizationId,
+        parentUserId: request.requesterUserId,
+        guardianLinkCode: request.guardianLinkCode,
+        approvedById: req.user!.userId,
+      });
+    }
   }
   const updated = await notificationPrisma.studentAccessRequest.update({
     where: { id: request.id },
@@ -178,6 +211,8 @@ export const reviewStudentAccessRequest = async (req: Request, res: Response) =>
     details: JSON.stringify({
       requesterUserId: updated.requesterUserId,
       requesterOrganizationId: updated.requesterOrganizationId,
+      requestedRole: updated.requestedRole,
+      guardianLinkCode: updated.guardianLinkCode,
       status,
       reviewerNote: updated.reviewerNote,
     }),
@@ -189,10 +224,10 @@ export const reviewStudentAccessRequest = async (req: Request, res: Response) =>
     userId: request.requesterUserId,
     eventType: 'STUDENT_ACCESS_REQUEST_REVIEWED',
     idempotencyKey: `student-access-request-reviewed:${updated.id}:${status}`,
-    title: status === StudentAccessRequestStatus.APPROVED ? 'Сурагчийн эрх батлагдлаа' : 'Сурагчийн эрхийн хүсэлт татгалзлаа',
+    title: status === StudentAccessRequestStatus.APPROVED ? `${accessRoleLabels[updated.requestedRole] || updated.requestedRole} эрх батлагдлаа` : `${accessRoleLabels[updated.requestedRole] || updated.requestedRole} эрхийн хүсэлт татгалзлаа`,
     body: status === StudentAccessRequestStatus.APPROVED
-      ? 'Менежер таны сурагчийн dashboard ашиглах эрхийг баталгаажууллаа. Дахин нэвтрээд сурагчийн хэсэг рүү орно уу.'
-      : `Менежер таны сурагчийн эрхийн хүсэлтийг татгалзлаа.${updated.reviewerNote ? `\n\nТайлбар: ${updated.reviewerNote}` : ''}`,
+      ? `Менежер таны "${accessRoleLabels[updated.requestedRole] || updated.requestedRole}" эрхийг баталгаажууллаа. Дахин нэвтрээд өөрийн хэсэг рүү орно уу.`
+      : `Менежер таны "${accessRoleLabels[updated.requestedRole] || updated.requestedRole}" эрхийн хүсэлтийг татгалзлаа.${updated.reviewerNote ? `\n\nТайлбар: ${updated.reviewerNote}` : ''}`,
     channels: ['IN_APP'],
     recipientEmail: request.requesterEmail || undefined,
     variables: {

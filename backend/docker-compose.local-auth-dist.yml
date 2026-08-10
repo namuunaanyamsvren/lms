@@ -1,0 +1,22 @@
+services:
+  auth-service:
+    volumes:
+      - ./auth-service/dist:/app/auth-service/dist:ro
+      - ./shared/dist:/app/shared/dist:ro
+  organization-service:
+    volumes:
+      - ./organization-service/dist:/app/organization-service/dist:ro
+      - ./shared/dist:/app/shared/dist:ro
+  billing-service:
+    volumes:
+      - ./billing-service/dist:/app/billing-service/dist:ro
+      - ./shared/dist:/app/shared/dist:ro
+  notification-service:
+    volumes:
+      - ./notification-service/dist:/app/notification-service/dist:ro
+      - ./notification-service/src/prisma:/app/notification-service/src/prisma:ro
+      - ./shared/dist:/app/shared/dist:ro
+  gateway:
+    volumes:
+      - ./gateway/dist:/app/gateway/dist:ro
+      - ./shared/dist:/app/shared/dist:ro
