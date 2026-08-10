@@ -64,6 +64,23 @@ const checkServiceHealth = async (baseUrl: string): Promise<boolean> => {
   }
 };
 
+const emptyAtRiskSummary = { total: 0, studentCount: 0, courseCount: 0, items: [] };
+
+const getDashboardAtRiskSummary = async (organizationId: string) => {
+  try {
+    const timeout = new Promise<typeof emptyAtRiskSummary>((resolve) => {
+      setTimeout(() => resolve(emptyAtRiskSummary), 2_000);
+    });
+    return await Promise.race([
+      getOrganizationAtRiskSummary(organizationId, 5, 6),
+      timeout,
+    ]);
+  } catch (error) {
+    console.warn('[Dashboard] at-risk summary unavailable', error);
+    return emptyAtRiskSummary;
+  }
+};
+
 // 1. Courses & Modules & Lessons
 export const getCourses = async (req: Request, res: Response) => {
   try {
@@ -705,7 +722,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       prisma.attendance.count({ where: { organizationId, status: 'PRESENT' } }),
       prisma.attendance.count({ where: { organizationId } }),
       getOrganizationBillingSummary(organizationId),
-      getOrganizationAtRiskSummary(organizationId),
+      getDashboardAtRiskSummary(organizationId),
     ]);
     const averageAttendancePct = totalAttendanceCount > 0 ? Math.round((presentCount / totalAttendanceCount) * 100) : null;
 
