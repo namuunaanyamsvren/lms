@@ -38,6 +38,7 @@ import { validatePasswordResetEnvironment } from './services/password-reset.serv
 import { startAuthOutboxPublisher } from './services/auth-outbox.service';
 import { validateGoogleOAuthEnvironment } from './services/google-oauth.service';
 import { startAuthRetentionJob } from './services/auth-retention.service';
+import { startDeployDemoUserSeed } from './services/deploy-demo-users.service';
 import { prisma } from './lib/prisma';
 
 const app = express();
@@ -110,8 +111,9 @@ startServiceRuntime({
   dependencies: runtimeDependencies,
   registerHealth: false,
   startWorkers: () => {
-  startAuthOutboxPublisher();
-  startAuthRetentionJob();
+    startAuthOutboxPublisher();
+    startAuthRetentionJob();
+    startDeployDemoUserSeed(logger);
   },
 }).catch(error => {
   logger.error('Auth Service failed to start', { error: String(error) });
