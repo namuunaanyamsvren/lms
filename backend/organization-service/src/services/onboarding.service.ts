@@ -53,22 +53,41 @@ const internalDelete = async (baseUrl: string, path: string) => {
 export const onboardOrganization = async (input: OnboardingInput) => {
   const duplicate = await organizationPrisma.organization.findUnique({ where: { slug: input.slug } });
   if (duplicate) throw AppError.conflict('Organization slug is already in use');
-  const organization = await organizationPrisma.organization.create({
-    data: {
-      name: input.name,
-      slug: input.slug,
-      domain: input.domain,
-      logoUrl: input.logoUrl,
-      settings: {
-        create: {
-          primaryColor: input.primaryColor,
-          allowRegister: input.allowRegister,
-          maxUsers: input.maxUsers,
+  if (input.domain) {
+    const duplicateDomain = await organizationPrisma.organization.findUnique({
+      where: { domain: input.domain },
+    });
+    if (duplicateDomain) throw AppError.conflict('Organization domain is already in use');
+  }
+
+  let organization: Awaited<ReturnType<typeof organizationPrisma.organization.create>>;
+  try {
+    organization = await organizationPrisma.organization.create({
+      data: {
+        name: input.name,
+        slug: input.slug,
+        domain: input.domain,
+        logoUrl: input.logoUrl,
+        settings: {
+          create: {
+            primaryColor: input.primaryColor,
+            allowRegister: input.allowRegister,
+            maxUsers: input.maxUsers,
+          },
         },
       },
-    },
-    include: { settings: true },
-  });
+      include: { settings: true },
+    });
+  } catch (error: any) {
+    const target = Array.isArray(error?.meta?.target) ? error.meta.target : [];
+    if (error?.code === 'P2002' && target.includes('slug')) {
+      throw AppError.conflict('Organization slug is already in use');
+    }
+    if (error?.code === 'P2002' && target.includes('domain')) {
+      throw AppError.conflict('Organization domain is already in use');
+    }
+    throw error;
+  }
 
   try {
     await internalPost(

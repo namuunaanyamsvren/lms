@@ -30,6 +30,17 @@ describe('organization provisioning compensation',()=>{
   expect(fetchMock).not.toHaveBeenCalled();
  });
 
+ it('fails fast on duplicate domain without provisioning downstream services',async()=>{
+  vi.spyOn(organizationPrisma.organization,'findUnique')
+   .mockResolvedValueOnce(null)
+   .mockResolvedValueOnce({id:'existing-domain'} as any);
+  const fetchMock=vi.spyOn(globalThis,'fetch');
+
+  await expect(onboardOrganization({name:'School',slug:'school',domain:'school.mn',admin:{email:'admin@school.mn',password:'StrongPass123!',firstName:'Admin',lastName:'User'}})).rejects.toThrow('Organization domain is already in use');
+
+  expect(fetchMock).not.toHaveBeenCalled();
+ });
+
  it('removes academic projection and organization when admin provisioning fails',async()=>{
   vi.stubEnv('SERVICE_TOKEN_SECRET','test-service-token-secret-at-least-32-bytes');
   vi.spyOn(organizationPrisma.organization,'findUnique').mockResolvedValue(null);
