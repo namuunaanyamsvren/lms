@@ -1,0 +1,15 @@
+.env
+**/.env
+.env.*
+**/.env.*
+!*.env.example
+!**/*.env.example
+deploy.env
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+*.log
+.DS_Store

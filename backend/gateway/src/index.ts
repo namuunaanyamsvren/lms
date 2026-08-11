@@ -23,11 +23,35 @@ import {
   accessRevocationMiddleware,
 } from '@lms/shared';
 import { config } from './config';
-import apiRoutes from './routes';
+import { createApiRoutes } from './routes';
 import { openApiDocument } from './openapi';
 
 const app = express();
 const logger = createLogger('gateway');
+
+const upstreamHealthDependency = (name: string, baseUrl: string, required = true) => ({
+  name,
+  required,
+  check: async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/health/live`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json().catch(() => null);
+      const service = body && typeof body === 'object' && 'service' in body
+        ? body.service
+        : null;
+      if (service && service !== name) {
+        throw new Error(`Unexpected service "${String(service)}"`);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+});
 
 validateServiceEnvironment('gateway');
 validateErrorMonitoringEnvironment();
@@ -56,7 +80,15 @@ app.use('/api', apiLimiter);
 // stream before http-proxy-middleware can pipe it through, causing proxied
 // POST/PUT/PATCH requests to hang waiting for a body that never arrives.
 
-registerHealthRoutes(app, 'gateway', []);
+registerHealthRoutes(app, 'gateway', [
+  upstreamHealthDependency('auth-service', config.services.auth),
+  upstreamHealthDependency('organization-service', config.services.organization),
+  upstreamHealthDependency('academic-service', config.services.academic),
+  upstreamHealthDependency('notification-service', config.services.notification, false),
+  ...(config.features.billing
+    ? [upstreamHealthDependency('billing-service', config.services.billing, false)]
+    : []),
+]);
 
 // Access-token-free auth operations. Every other API request is rejected at
 // the edge before it reaches a downstream service.
@@ -108,7 +140,7 @@ app.use('/api', (req, _res, next) => {
 });
 
 // Proxy routes
-app.use(apiRoutes);
+app.use(createApiRoutes());
 
 app.use(notFoundHandler);
 app.use(errorHandler);

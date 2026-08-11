@@ -3,7 +3,6 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { createLogger } from '@lms/shared';
 import { config } from '../config';
 
-const router = Router();
 const logger = createLogger('gateway');
 
 // Public paths are versioned (/api/v1/...); downstream services still mount
@@ -58,33 +57,39 @@ if (config.features.billing) routes.push(
   { path: '/api/v1/payments', target: config.services.billing },
 );
 
-routes.forEach(({ path, target, pathRewrite }) => {
-  // NOTE: the proxy `context` (path) is passed to createProxyMiddleware itself,
-  // NOT to router.use(). If it were passed to router.use(path, ...), Express
-  // would strip the matched prefix from req.url before the proxy middleware
-  // ever sees it (e.g. /api/v1/auth/login -> /login), and since downstream
-  // services mount their routes under the legacy full prefix (e.g. auth-service
-  // expects /api/auth/login), every proxied request would 404. Letting
-  // http-proxy-middleware do its own prefix matching preserves the full
-  // original path, which pathRewrite then translates to the legacy shape.
-  router.use(
-    createProxyMiddleware(path, {
-      target,
-      changeOrigin: true,
-      xfwd: true,
-      pathRewrite: pathRewrite || V1_TO_LEGACY,
-      onError: (err, req, res) => {
-        logger.error(`Proxy target unreachable: ${target}`, { error: err.message });
-        if (!res.headersSent) {
-          res.status(504).json({
-            success: false,
-            message: 'Target microservice is starting or unavailable.',
-            code: 'SERVICE_UNAVAILABLE',
-          });
-        }
-      },
-    })
-  );
-});
+export const createApiRoutes = () => {
+  const router = Router();
 
-export default router;
+  routes.forEach(({ path, target, pathRewrite }) => {
+    // NOTE: the proxy `context` (path) is passed to createProxyMiddleware itself,
+    // NOT to router.use(). If it were passed to router.use(path, ...), Express
+    // would strip the matched prefix from req.url before the proxy middleware
+    // ever sees it (e.g. /api/v1/auth/login -> /login), and since downstream
+    // services mount their routes under the legacy full prefix (e.g. auth-service
+    // expects /api/auth/login), every proxied request would 404. Letting
+    // http-proxy-middleware do its own prefix matching preserves the full
+    // original path, which pathRewrite then translates to the legacy shape.
+    router.use(
+      createProxyMiddleware(path, {
+        target,
+        changeOrigin: true,
+        xfwd: true,
+        pathRewrite: pathRewrite || V1_TO_LEGACY,
+        onError: (err, req, res) => {
+          logger.error(`Proxy target unreachable: ${target}`, { error: err.message });
+          if (!res.headersSent) {
+            res.status(504).json({
+              success: false,
+              message: 'Target microservice is starting or unavailable.',
+              code: 'SERVICE_UNAVAILABLE',
+            });
+          }
+        },
+      })
+    );
+  });
+
+  return router;
+};
+
+export default createApiRoutes;
