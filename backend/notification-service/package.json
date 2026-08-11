@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@lms/shared": "1.0.0",
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "^7.9.1",
     "@types/nodemailer": "^6.4.24",
     "amqplib": "^0.10.3",
     "cors": "^2.8.5",
