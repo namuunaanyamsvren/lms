@@ -9,6 +9,8 @@ const demoAccounts = [
   { label: 'Багш', email: 'teacher@lms.mn' },
   { label: 'Сурагч', email: 'student@lms.mn' },
   { label: 'Эцэг эх', email: 'parent@lms.mn' },
+  { label: 'Захирал', email: 'principal@lms.mn' },
+  { label: 'Хэрэглэгч', email: 'user@lms.mn' },
 ];
 const demoPassword = 'password123';
 const demoTenant = 'mongol-erdem';
@@ -70,7 +72,7 @@ export default function Login() {
             <p className="text-xs font-semibold text-slate-700">Demo байгууллага: {demoTenant}</p>
             <p className="text-[11px] text-slate-500">Нууц үг: {demoPassword}</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {demoAccounts.map(account => (
               <button
                 key={account.email}

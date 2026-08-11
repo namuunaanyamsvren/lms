@@ -32,7 +32,7 @@ Demo users:
 - `teacher@lms.mn`
 - `student@lms.mn`
 - `parent@lms.mn`
-- `staff@lms.mn`
 - `principal@lms.mn`
+- `user@lms.mn`
 
 The seed is deterministic and idempotent. It refuses production and non-loopback database hosts unless `ALLOW_NONLOCAL_DEV_SEED=true` is explicitly set for ephemeral test systems.

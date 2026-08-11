@@ -11,9 +11,7 @@ const ROLE_LABELS = {
   STUDENT: 'Сурагч',
   INSTRUCTOR: 'Багш',
   PARENT: 'Эцэг эх',
-  STAFF: 'Ажилтан',
   PRINCIPAL: 'Захирал',
-  FINANCE: 'Санхүү',
   ORG_ADMIN: 'Менежер',
   SUPER_ADMIN: 'Ерөнхий менежер',
 };

@@ -76,6 +76,24 @@ const demoUsers = [
     lastName: 'Parent',
     role: 'PARENT',
   },
+  {
+    key: 'principal',
+    email: 'principal@lms.mn',
+    username: 'principal',
+    phone: '99556677',
+    firstName: 'Demo',
+    lastName: 'Principal',
+    role: 'PRINCIPAL',
+  },
+  {
+    key: 'user',
+    email: 'user@lms.mn',
+    username: 'user',
+    phone: '99667788',
+    firstName: 'Demo',
+    lastName: 'User',
+    role: 'USER',
+  },
 ];
 
 const demoId = key => `demo-${slug}-${key}`;

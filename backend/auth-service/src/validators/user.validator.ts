@@ -5,8 +5,6 @@ export const managedRole = z.enum([
   'SUPER_ADMIN',
   'ORG_ADMIN',
   'PRINCIPAL',
-  'STAFF',
-  'FINANCE',
   'INSTRUCTOR',
   'STUDENT',
   'PARENT',

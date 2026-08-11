@@ -31,6 +31,8 @@ describe('deploy demo user seed service', () => {
       ['teacher@lms.mn', Role.INSTRUCTOR],
       ['student@lms.mn', Role.STUDENT],
       ['parent@lms.mn', Role.PARENT],
+      ['principal@lms.mn', Role.PRINCIPAL],
+      ['user@lms.mn', Role.USER],
     ]);
   });
 

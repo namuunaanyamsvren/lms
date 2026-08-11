@@ -66,7 +66,7 @@ const ids = Object.freeze({
   teacher: 'usr_teacher_1',
   student: 'usr_student_1',
   parent: 'usr_parent_1',
-  staff: 'usr_staff_1',
+  user: 'usr_user_1',
   principal: 'usr_principal_1',
   course: 'course_calculus_1',
   courseProgramming: 'course_programming_1',
@@ -116,12 +116,12 @@ const users = [
     firstName: 'Наранцэцэг', lastName: 'Болд', role: 'PARENT',
   },
   {
-    id: ids.staff, email: 'staff@lms.mn', username: 'staff', phone: '99556677',
-    firstName: 'Төмөр', lastName: 'Цогт', role: 'STAFF',
-  },
-  {
     id: ids.principal, email: 'principal@lms.mn', username: 'principal', phone: '99667788',
     firstName: 'Баатар', lastName: 'Мөнх', role: 'PRINCIPAL',
+  },
+  {
+    id: ids.user, email: 'user@lms.mn', username: 'user', phone: '99556677',
+    firstName: 'Номин', lastName: 'Гэрэл', role: 'USER',
   },
 ];
 
@@ -613,7 +613,7 @@ async function seedAcademic() {
     create: {
       id: ids.announcement,
       organizationId: ids.organization,
-      authorId: ids.staff,
+      authorId: ids.principal,
       title: 'Номын сангийн цаг',
       body: 'Мягмар, пүрэв гарагт нэмэлт цагаар нээлттэй.',
     },

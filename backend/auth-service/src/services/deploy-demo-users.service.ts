@@ -29,7 +29,7 @@ type DemoUser = {
 
 const DEFAULT_DEMO_SLUG = 'mongol-erdem';
 const DEFAULT_DEMO_PASSWORD = 'password123';
-const SEED_MARKER_EVENT_TYPE = 'DEPLOY_DEMO_USERS_SEEDED';
+const SEED_MARKER_EVENT_TYPE = 'DEPLOY_DEMO_USERS_SEEDED_V2';
 
 export const isDeployDemoUserSeedEnabled = (env: NodeJS.ProcessEnv = process.env) => {
   if (env.ENABLE_DEMO_USERS_SEED !== undefined) return env.ENABLE_DEMO_USERS_SEED === 'true';
@@ -74,6 +74,24 @@ export const demoUserDefinitions = (): DemoUser[] => [
     firstName: 'Demo',
     lastName: 'Parent',
     role: Role.PARENT,
+  },
+  {
+    key: 'principal',
+    email: 'principal@lms.mn',
+    username: 'principal',
+    phone: '99556677',
+    firstName: 'Demo',
+    lastName: 'Principal',
+    role: Role.PRINCIPAL,
+  },
+  {
+    key: 'user',
+    email: 'user@lms.mn',
+    username: 'user',
+    phone: '99667788',
+    firstName: 'Demo',
+    lastName: 'User',
+    role: Role.USER,
   },
 ];
 

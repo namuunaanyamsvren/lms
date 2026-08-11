@@ -58,7 +58,7 @@ export default function ProfileDropdown({ user = {}, onLogout, onNavigate, class
                 <div>
                   <p className="font-semibold text-sm">{displayName}</p>
                   <p className="text-[11px] text-white/80">{user.email}</p>
-                  <p className="text-[10px] text-white/90 font-medium mt-0.5">{({ USER: 'Энгийн хэрэглэгч', STUDENT: 'Сурагч', INSTRUCTOR: 'Багш', PARENT: 'Эцэг эх', STAFF: 'Ажилтан', PRINCIPAL: 'Захирал', FINANCE: 'Санхүү', ORG_ADMIN: 'Менежер', SUPER_ADMIN: 'Ерөнхий менежер' })[user.role] || 'Хэрэглэгч'}</p>
+                  <p className="text-[10px] text-white/90 font-medium mt-0.5">{({ USER: 'Энгийн хэрэглэгч', STUDENT: 'Сурагч', INSTRUCTOR: 'Багш', PARENT: 'Эцэг эх', PRINCIPAL: 'Захирал', ORG_ADMIN: 'Менежер', SUPER_ADMIN: 'Ерөнхий менежер' })[user.role] || 'Хэрэглэгч'}</p>
                 </div>
               </div>
             </div>

@@ -47,11 +47,9 @@ const roleEnum = z.enum([
   'SUPER_ADMIN',
   'ORG_ADMIN',
   'PRINCIPAL',
-  'STAFF',
   'INSTRUCTOR',
   'STUDENT',
   'PARENT',
-  'FINANCE',
 ]);
 const statusEnum = z.enum(['INVITED', 'ACTIVE', 'SUSPENDED', 'DEACTIVATED']);
 

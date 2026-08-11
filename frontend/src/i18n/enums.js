@@ -2,11 +2,9 @@ export const roleLabels = {
   USER: 'Энгийн хэрэглэгч',
   ORG_ADMIN: 'Менежер',
   PRINCIPAL: 'Захирал',
-  STAFF: 'Ажилтан',
   INSTRUCTOR: 'Багш',
   STUDENT: 'Сурагч',
   PARENT: 'Эцэг эх',
-  FINANCE: 'Санхүү',
 };
 
 export const userStatusLabels = {
