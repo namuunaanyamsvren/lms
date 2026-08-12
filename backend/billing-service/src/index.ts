@@ -26,7 +26,7 @@ import { startBillingOutboxPublisher } from './services/event-outbox.service';
 import { startBillingEventReconciliation } from './services/event-reconciliation.service';
 import { startBillingReminderScheduler } from './services/reminder-scheduler.service';
 import { deactivateOrganizationBilling, getAccessStatus, getRevenueSummary } from './controllers/internal.controller';
-import { handleQPayWebhook } from './controllers/billing.controller';
+import { handleQPayWebhook, handleStripeWebhook } from './controllers/billing.controller';
 import { validateQPayConfiguration } from './services/qpay-provider.service';
 import { prisma } from './lib/prisma';
 
@@ -44,8 +44,9 @@ app.use(tracingMiddleware('billing-service'));
 app.use(requestLogger);
 applyCors(app);
 applyHttpSecurity(app);
-app.use(express.json({ limit: '1mb' }));
 
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), asyncHandler(handleStripeWebhook));
+app.use(express.json({ limit: '1mb' }));
 app.post('/api/payments/qpay/webhook', asyncHandler(handleQPayWebhook));
 
 app.delete(

@@ -4,8 +4,19 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { enqueueBillingEvent } from '../services/event-outbox.service';
 import { createQPayProviderInvoice, verifyQPayWebhookSignature } from '../services/qpay-provider.service';
+import {
+  createStripeCheckoutSession,
+  getStripeCheckoutPrice,
+  verifyStripeWebhookEvent,
+} from '../services/stripe-provider.service';
 
 import { prisma } from '../lib/prisma';
+const PLAN_LABELS: Record<PlanType, string> = {
+  FREE: 'Free',
+  BASIC: 'Basic',
+  PRO: 'Pro',
+  ENTERPRISE: 'Enterprise',
+};
 const subscriptionSchema = z
   .object({
     plan: z.nativeEnum(PlanType),
@@ -56,6 +67,12 @@ const qpayWebhookSchema = z.object({
   amount: z.union([z.string(), z.number()]).optional(),
   currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
 }).passthrough();
+const stripeCheckoutSchema = z.object({
+  invoiceId: z.string().trim().min(1).max(200).optional(),
+  plan: z.nativeEnum(PlanType).default(PlanType.PRO),
+  successUrl: z.string().url().optional(),
+  cancelUrl: z.string().url().optional(),
+}).strict();
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 export const isInvoiceTransitionAllowed = (from: PaymentStatus, to: PaymentStatus) =>
@@ -283,6 +300,122 @@ export const createQPayInvoice = async (req: Request, res: Response) => {
   return res.status(201).json({ success: true, data: { invoice, payment, qpayInvoiceUrl } });
 };
 
+const frontendBaseUrl = () => {
+  const explicit = process.env.FRONTEND_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, '');
+  const firstOrigin = (process.env.ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).find(Boolean);
+  return (firstOrigin || 'http://localhost:5173').replace(/\/+$/, '');
+};
+
+const redirectUrl = (candidate: string | undefined, fallbackPath: string) => {
+  const fallback = `${frontendBaseUrl()}${fallbackPath}`;
+  if (!candidate) return fallback;
+  const allowedOrigins = new Set([
+    frontendBaseUrl(),
+    ...(process.env.ALLOWED_ORIGINS || '').split(',').map(value => value.trim().replace(/\/+$/, '')).filter(Boolean),
+  ]);
+  try {
+    const parsed = new URL(candidate);
+    const origin = `${parsed.protocol}//${parsed.host}`;
+    return allowedOrigins.has(origin) ? candidate : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const ensureStripeCheckoutInvoice = async (
+  organizationId: string,
+  plan: PlanType,
+) => {
+  const price = await getStripeCheckoutPrice();
+  const description = `LMS ${PLAN_LABELS[plan] || plan} subscription`;
+  const now = new Date();
+  const nextBillingAt = new Date(now.getTime() + (price.interval === 'yearly' ? 365 : 30) * 86_400_000);
+  return prisma.$transaction(async tx => {
+    const subscription = await tx.subscription.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        plan,
+        amount: price.amount,
+        currency: price.currency,
+        billingCycle: price.interval,
+        isActive: false,
+        nextBillingAt,
+      },
+      update: {
+        plan,
+        amount: price.amount,
+        currency: price.currency,
+        billingCycle: price.interval,
+        nextBillingAt,
+      },
+    });
+    const existing = await tx.invoice.findFirst({
+      where: {
+        organizationId,
+        subscriptionId: subscription.id,
+        status: PaymentStatus.PENDING,
+        studentId: null,
+        cohortId: null,
+        enrollmentId: null,
+        description,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const invoice = existing || await tx.invoice.create({
+      data: {
+        organizationId,
+        subscriptionId: subscription.id,
+        amount: price.amount,
+        currency: price.currency,
+        description,
+        dueDate: now,
+        accessRestricted: true,
+      },
+    });
+    return { subscription, invoice, price };
+  });
+};
+
+export const createStripeCheckout = async (req: Request, res: Response) => {
+  const input = stripeCheckoutSchema.parse(req.body || {});
+  const organizationId = req.organizationId!;
+  const target = input.invoiceId
+    ? {
+        invoice: await prisma.invoice.findFirst({
+          where: { id: input.invoiceId, organizationId, status: PaymentStatus.PENDING },
+        }),
+        subscription: null,
+        price: null,
+      }
+    : await ensureStripeCheckoutInvoice(organizationId, input.plan);
+  if (!target.invoice) throw AppError.notFound('Pending invoice not found');
+
+  const session = await createStripeCheckoutSession({
+    invoiceId: target.invoice.id,
+    organizationId,
+    userId: req.user?.userId,
+    amount: target.invoice.amount,
+    currency: target.invoice.currency,
+    description: target.invoice.description,
+    successUrl: redirectUrl(input.successUrl, '/admin/billing?billing=stripe-success'),
+    cancelUrl: redirectUrl(input.cancelUrl, '/admin/billing?billing=stripe-cancelled'),
+    priceId: target.price?.priceId,
+    mode: target.price?.mode || 'payment',
+  });
+  if (!session.url) throw AppError.internal('Stripe did not return a checkout URL');
+  return res.status(201).json({
+    success: true,
+    data: {
+      url: session.url,
+      sessionId: session.id,
+      invoice: target.invoice,
+      subscription: target.subscription,
+    },
+  });
+};
+
 export const handleQPayWebhook = async (req: Request, res: Response) => {
   const rawBody = JSON.stringify(req.body || {});
   if (!verifyQPayWebhookSignature(rawBody, req.get('x-qpay-signature') || req.get('x-signature'))) {
@@ -326,6 +459,71 @@ export const handleQPayWebhook = async (req: Request, res: Response) => {
       })
     : await markInvoiceFailedById(invoice.organizationId, invoice.id, transactionId, toJson(event));
   return res.json({ success: true, data: result });
+};
+
+export const handleStripeWebhook = async (req: Request, res: Response) => {
+  const event = verifyStripeWebhookEvent(
+    Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {})),
+    req.get('stripe-signature') || undefined,
+  );
+  const session = event?.data?.object || {};
+  const organizationId = session.metadata?.organizationId;
+  const invoiceId = session.metadata?.invoiceId;
+
+  if (event.type === 'checkout.session.completed') {
+    if (!organizationId || !invoiceId) throw AppError.badRequest('Stripe session metadata is missing');
+    const invoice = await prisma.invoice.findFirst({ where: { id: invoiceId, organizationId } });
+    if (!invoice) throw AppError.notFound('Invoice not found for Stripe session');
+    if (session.amount_total != null) {
+      const paidAmount = new Prisma.Decimal(session.amount_total).div(100);
+      if (!paidAmount.equals(invoice.amount)) throw AppError.badRequest('Stripe amount does not match invoice');
+    }
+    if (session.currency && String(session.currency).toUpperCase() !== invoice.currency) {
+      throw AppError.badRequest('Stripe currency does not match invoice');
+    }
+    const transactionId = `stripe:${session.payment_intent || session.subscription || session.id}`;
+    const result = await completeInvoicePaymentById(organizationId, invoice.id, {
+      amount: invoice.amount,
+      currency: invoice.currency,
+      method: 'STRIPE',
+      transactionId,
+      providerPayload: toJson({
+        provider: 'STRIPE',
+        eventId: event.id,
+        sessionId: session.id,
+        mode: session.mode,
+        paymentIntent: session.payment_intent,
+        subscription: session.subscription,
+      }),
+    });
+    const subscription = await prisma.subscription.findUnique({ where: { id: result.invoice.subscriptionId } });
+    const nextBillingDays = subscription?.billingCycle === 'yearly' ? 365 : 30;
+    await prisma.subscription.update({
+      where: { id: result.invoice.subscriptionId },
+      data: {
+        isActive: true,
+        nextBillingAt: new Date(Date.now() + nextBillingDays * 86_400_000),
+      },
+    });
+    return res.json({ success: true, data: { processed: true } });
+  }
+
+  if (event.type === 'checkout.session.expired' && organizationId && invoiceId) {
+    const invoice = await prisma.invoice.findFirst({ where: { id: invoiceId, organizationId } });
+    if (!invoice || invoice.status !== PaymentStatus.PENDING) {
+      return res.json({ success: true, data: { ignored: true, type: event.type } });
+    }
+    await markInvoiceFailedById(
+      organizationId,
+      invoiceId,
+      `stripe:${session.id}`,
+      toJson({ provider: 'STRIPE', eventId: event.id, sessionId: session.id, type: event.type }),
+      'STRIPE',
+    );
+    return res.json({ success: true, data: { processed: true } });
+  }
+
+  return res.status(202).json({ success: true, data: { ignored: true, type: event.type } });
 };
 
 export const listOutstandingInvoices = async (req: Request, res: Response) => {
@@ -548,6 +746,7 @@ const markInvoiceFailedById = async (
   invoiceId: string,
   transactionId: string,
   providerPayload: Prisma.InputJsonValue,
+  method = 'QPAY',
 ) => prisma.$transaction(async tx => {
   const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, organizationId } });
   if (!invoice) throw AppError.notFound('Invoice not found');
@@ -561,7 +760,7 @@ const markInvoiceFailedById = async (
       invoiceId,
       amount: invoice.amount,
       currency: invoice.currency,
-      method: 'QPAY',
+      method,
       transactionId,
       status: PaymentStatus.FAILED,
       providerPayload,

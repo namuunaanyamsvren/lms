@@ -735,6 +735,14 @@ export const payInvoice = (id, payload = {}) =>
 export const createQPayInvoice = (id) =>
   fetchWithAuth(`${BASE_API_URL}/payments/invoices/${id}/qpay`, { method: 'POST', body: '{}' });
 
+export const createStripeCheckout = async (payload = {}) => {
+  const data = await fetchWithAuth(`${BASE_API_URL}/payments/checkout`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data.data;
+};
+
 export const fetchOutstandingInvoices = async () => {
   const data = await fetchWithAuth(`${BASE_API_URL}/payments/outstanding`);
   return data.data;

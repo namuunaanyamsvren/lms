@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler, authMiddleware, createPrincipalRateLimiter, idempotencyMiddleware, requireRole, tenantMiddleware } from '@lms/shared';
 import {
   createQPayInvoice,
+  createStripeCheckout,
   failInvoice,
   getBillingOverview,
   issueInvoice,
@@ -20,6 +21,7 @@ router.get('/', asyncHandler(getBillingOverview));
 router.get('/invoices', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), asyncHandler(listInvoices));
 router.get('/outstanding', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), asyncHandler(listOutstandingInvoices));
 router.get('/history', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), asyncHandler(listPayments));
+router.post('/checkout', requireRole('SUPER_ADMIN', 'ORG_ADMIN'), asyncHandler(createStripeCheckout));
 router.put('/subscription', requireRole('SUPER_ADMIN', 'ORG_ADMIN'), asyncHandler(updateSubscription));
 router.post('/invoices', requireRole('SUPER_ADMIN', 'ORG_ADMIN'), idempotencyMiddleware('invoice-issue'), asyncHandler(issueInvoice));
 router.post('/invoices/:id/pay', requireRole('SUPER_ADMIN', 'ORG_ADMIN', 'STUDENT'), idempotencyMiddleware('invoice-pay'), asyncHandler(payInvoice));

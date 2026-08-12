@@ -21,7 +21,7 @@ services:
       - key: PORT
         value: "8000"
       - key: FEATURE_BILLING_ENABLED
-        value: "false"
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL

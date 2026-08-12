@@ -100,6 +100,7 @@ const adminMenu = role => [
   { icon: GraduationCap, label: 'Тэтгэлэг', href: '/admin/scholarships' },
   { icon: LineChart, label: 'Тайлан мэдээ', href: '/admin/reports' },
   { icon: ScrollText, label: 'Аудит лог', href: '/admin/audit-log' },
+  { icon: CreditCard, label: 'Төлбөр', href: '/admin/billing' },
   { icon: Activity, label: 'Системийн төлөв', href: '/admin/system-health' },
   { icon: User, label: 'Профайл', href: '/profile' },
   { icon: Settings, label: 'Тохиргоо', href: '/admin/settings' },

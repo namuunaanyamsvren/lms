@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader';
 import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -13,6 +14,7 @@ import {
   fetchPaymentHistory,
   updateSubscription,
   issueInvoice,
+  createStripeCheckout,
   payInvoice,
   failInvoice,
   refundInvoice,
@@ -33,6 +35,7 @@ export default function Billing() {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState('invoices');
   const [planOpen, setPlanOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
@@ -48,6 +51,7 @@ export default function Billing() {
 
   const planMutation = useMutation({ mutationFn: updateSubscription, onSuccess: invalidateBilling });
   const issueMutation = useMutation({ mutationFn: issueInvoice, onSuccess: invalidateBilling });
+  const stripeMutation = useMutation({ mutationFn: createStripeCheckout, onSuccess: invalidateBilling });
   const payMutation = useMutation({ mutationFn: (id) => payInvoice(id), onSuccess: invalidateBilling });
   const failMutation = useMutation({ mutationFn: failInvoice, onSuccess: invalidateBilling });
   const refundMutation = useMutation({ mutationFn: refundInvoice, onSuccess: invalidateBilling });
@@ -72,6 +76,34 @@ export default function Billing() {
       showToast(err?.response?.data?.message || 'Нэхэмжлэх үүсгэхэд алдаа гарлаа', 'error');
     }
   });
+
+  useEffect(() => {
+    const status = searchParams.get('billing');
+    if (status === 'stripe-success') {
+      showToast('Stripe төлбөр амжилттай боллоо. Төлөв шинэчлэгдэж байна.', 'success');
+      invalidateBilling();
+      setSearchParams({}, { replace: true });
+    }
+    if (status === 'stripe-cancelled') {
+      showToast('Stripe төлбөр цуцлагдлаа.', 'info');
+      setSearchParams({}, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startStripeCheckout = async (payload = {}) => {
+    try {
+      const checkout = await stripeMutation.mutateAsync({
+        ...payload,
+        successUrl: `${window.location.origin}/admin/billing?billing=stripe-success`,
+        cancelUrl: `${window.location.origin}/admin/billing?billing=stripe-cancelled`,
+      });
+      if (!checkout?.url) throw new Error('Stripe checkout URL ирсэнгүй.');
+      window.location.assign(checkout.url);
+    } catch (err) {
+      showToast(err?.response?.data?.message || err.message || 'Stripe Checkout эхлүүлэхэд алдаа гарлаа', 'error');
+    }
+  };
 
   const handlePay = async (id) => {
     try {
@@ -112,6 +144,9 @@ export default function Billing() {
         right={
           <div className="flex gap-2">
             <button onClick={() => setPlanOpen(true)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50">Багц өөрчлөх</button>
+            <button onClick={() => startStripeCheckout({ plan: 'PRO' })} disabled={stripeMutation.isPending} className="flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 shadow-xs hover:bg-indigo-100 disabled:opacity-60">
+              <CreditCard size={15} />Stripe-р төлөх
+            </button>
             <button onClick={() => setIssueOpen(true)} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700">
               <Plus size={15} />Нэхэмжлэх үүсгэх
             </button>
@@ -122,7 +157,17 @@ export default function Billing() {
       {overviewQuery.isLoading ? (
         <div className="flex min-h-[20vh] items-center justify-center"><LoadingSpinner /></div>
       ) : !subscription ? (
-        <Card><p className="text-sm text-slate-500">Багц бүртгэгдээгүй байна.</p></Card>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Багц идэвхжээгүй байна.</p>
+              <p className="mt-1 text-xs text-slate-500">Stripe Checkout-р төлбөрөө төлөөд байгууллагын эрхийг идэвхжүүлнэ.</p>
+            </div>
+            <button onClick={() => startStripeCheckout({ plan: 'PRO' })} disabled={stripeMutation.isPending} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-indigo-700 disabled:opacity-60">
+              <CreditCard size={15} />Stripe-р идэвхжүүлэх
+            </button>
+          </div>
+        </Card>
       ) : (
         <Card>
           <div className="flex flex-wrap items-center gap-6">
@@ -172,6 +217,7 @@ export default function Billing() {
                           {inv.status === 'PENDING' && (
                             <>
                               <button onClick={() => handlePay(inv.id)} title="Төлөгдсөн" className="rounded-xl border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"><Check size={14} /></button>
+                              <button onClick={() => startStripeCheckout({ invoiceId: inv.id })} title="Stripe-р төлөх" className="rounded-xl border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"><CreditCard size={14} /></button>
                               <button onClick={() => handleFail(inv.id)} title="Амжилтгүй" className="rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"><X size={14} /></button>
                             </>
                           )}

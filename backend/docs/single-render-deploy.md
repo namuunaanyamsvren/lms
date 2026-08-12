@@ -30,6 +30,8 @@ The blueprint generates the token and service secrets. Fill these manually:
 - `FRONTEND_URL`: your Vercel URL, for example `https://lms-i3ha.vercel.app`
 - `ALLOWED_ORIGINS`: same frontend URL, comma-separated if more than one
 - `TENANT_BASE_DOMAIN`: frontend host, for example `lms-i3ha.vercel.app`
+- `FEATURE_BILLING_ENABLED`: set `true` to expose billing/Stripe routes, or
+  `false` to keep billing disabled.
 
 Render free tier allows only one active free Postgres database and one free Key
 Value instance per account. Do not create new database/cache resources for this
@@ -43,6 +45,9 @@ Optional:
   failures instead of taking down the demo backend.
 - `FILE_DOWNLOAD_BASE_URL`: set the single backend URL after Render creates it.
   If omitted in staging, the service uses Render's external URL.
+- Stripe Checkout values when billing is enabled:
+  `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and either `STRIPE_PRICE_ID`
+  or `STRIPE_CHECKOUT_UNIT_AMOUNT` plus `STRIPE_CHECKOUT_CURRENCY`.
 - Google OAuth values can be filled when OAuth is needed:
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`.
 

@@ -36,7 +36,12 @@ export default function Login() {
     setLocalError(null);
     try{const tenant=await resolveTenant(resolveLoginTenantKey(location.state));
       const result = await login({organizationId:tenant.id,identifier:identifier.trim(),password});
-      if (result.success) navigate(result.redirectPath, { replace: true });
+      if (result.success) {
+        const redirectPath = location.state?.organizationCreated && result.redirectPath === '/admin'
+          ? '/admin/billing'
+          : result.redirectPath;
+        navigate(redirectPath, { replace: true });
+      }
     }catch(error){setLocalError(error.message||'Байгууллагыг тодорхойлж чадсангүй.');}
   };
 
