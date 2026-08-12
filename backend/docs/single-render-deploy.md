@@ -25,16 +25,24 @@ produce repeated `502 Bad Gateway` errors.
 
 The blueprint generates the token and service secrets. Fill these manually:
 
+- `DATABASE_URL`: existing Render Postgres external connection string
+- `REDIS_URL`: existing Render Key Value external connection string
 - `FRONTEND_URL`: your Vercel URL, for example `https://lms-i3ha.vercel.app`
 - `ALLOWED_ORIGINS`: same frontend URL, comma-separated if more than one
 - `TENANT_BASE_DOMAIN`: frontend host, for example `lms-i3ha.vercel.app`
-- `FILE_DOWNLOAD_BASE_URL`: the single backend URL after Render creates it
+
+Render free tier allows only one active free Postgres database and one free Key
+Value instance per account. Do not create new database/cache resources for this
+single-service demo; reuse the existing `lms-postgres` and `lms-redis`
+connection strings.
 
 Optional:
 
 - `RABBITMQ_URL`: set CloudAMQP if notification/event workers are needed.
   If omitted in staging, HTTP flows still start and workers log connection
   failures instead of taking down the demo backend.
+- `FILE_DOWNLOAD_BASE_URL`: set the single backend URL after Render creates it.
+  If omitted in staging, the service uses Render's external URL.
 - Google OAuth values can be filled when OAuth is needed:
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`.
 
