@@ -69,7 +69,9 @@ export default function OnboardOrganization() {
           lastName: form.lastName.trim(),
         },
       });
-      navigate('/login', { state: { organizationCreated: true } });
+      navigate(`/login?tenant=${encodeURIComponent(normalizedSlug)}`, {
+        state: { organizationCreated: true, tenantSlug: normalizedSlug },
+      });
     } catch (requestError) {
       setError(formatRequestError(requestError));
     } finally {
