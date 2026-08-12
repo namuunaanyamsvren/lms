@@ -20,6 +20,7 @@ import { startUserLifecycleConsumers } from './events/user-lifecycle.consumer';
 import { startAcademicEventReconciliation } from './services/event-reconciliation.service';
 import { exportUserAcademicData } from './controllers/privacy.controller';
 import { startReportProcessing } from './services/report-job.service';
+import { startDeployDemoAcademicSeed } from './services/deploy-demo-academic-data.service';
 import { prisma } from './lib/prisma';
 
 const app = express();
@@ -95,6 +96,7 @@ startServiceRuntime({
     startAcademicEventReconciliation();
     startAssignmentScheduler();
     startReportProcessing();
+    startDeployDemoAcademicSeed(logger);
   },
 }).catch(error => {
   logger.error('Academic Service failed to start', { error: String(error) });
