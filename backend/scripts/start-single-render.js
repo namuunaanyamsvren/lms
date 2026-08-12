@@ -118,6 +118,9 @@ const baseEnv = () => {
     FILE_STORAGE_DIRECTORY: process.env.FILE_STORAGE_DIRECTORY || '/data/private-uploads',
     FILE_STORAGE_AT_REST_ENCRYPTED: process.env.FILE_STORAGE_AT_REST_ENCRYPTED || 'false',
     MALWARE_SCAN_MODE: process.env.MALWARE_SCAN_MODE || 'disabled',
+    STARTUP_DEPENDENCY_ATTEMPTS: process.env.STARTUP_DEPENDENCY_ATTEMPTS || '20',
+    STARTUP_DEPENDENCY_RETRY_DELAY_MS: process.env.STARTUP_DEPENDENCY_RETRY_DELAY_MS || '3000',
+    STARTUP_DEPENDENCY_TIMEOUT_MS: process.env.STARTUP_DEPENDENCY_TIMEOUT_MS || '10000',
   };
 
   if (!env.FRONTEND_URL) env.FRONTEND_URL = firstOrigin() || publicBackendUrl();

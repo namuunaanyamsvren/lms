@@ -52,6 +52,21 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   ]).finally(() => clearTimeout(timeout));
 }
 
+function positiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function summarizeChecks(checks: DependencyStatus[]): string {
+  return checks
+    .map(check => `${check.name}:${check.status}${check.error ? ` (${check.error})` : ''}`)
+    .join('; ');
+}
+
 export function prismaDependency(prisma: PrismaLikeClient): RuntimeDependency {
   return {
     name: 'prisma',
@@ -131,15 +146,26 @@ export async function startServiceRuntime(options: ServiceRuntimeOptions): Promi
     ...(options.prisma ? [prismaDependency(options.prisma)] : []),
     ...(options.dependencies || []),
   ];
-  const readinessTimeoutMs = options.readinessTimeoutMs || 3000;
+  const readinessTimeoutMs = options.readinessTimeoutMs || positiveInteger(process.env.STARTUP_DEPENDENCY_TIMEOUT_MS, 3000);
+  const startupAttempts = positiveInteger(process.env.STARTUP_DEPENDENCY_ATTEMPTS, 1);
+  const startupRetryDelayMs = positiveInteger(process.env.STARTUP_DEPENDENCY_RETRY_DELAY_MS, 1000);
   if (options.registerHealth !== false) {
     registerHealthRoutes(options.app, options.serviceName, dependencies, readinessTimeoutMs);
   }
 
-  const startupChecks = await checkDependencies(dependencies, readinessTimeoutMs);
+  let startupChecks = await checkDependencies(dependencies, readinessTimeoutMs);
+  for (let attempt = 1; attempt < startupAttempts; attempt += 1) {
+    const failedRequired = startupChecks.filter(check => check.required && check.status !== 'ok');
+    if (!failedRequired.length) break;
+    options.logger.warn?.(
+      `${options.serviceName} startup dependency check attempt ${attempt}/${startupAttempts} failed: ${summarizeChecks(startupChecks)}`,
+    );
+    await sleep(startupRetryDelayMs);
+    startupChecks = await checkDependencies(dependencies, readinessTimeoutMs);
+  }
   const failedRequired = startupChecks.filter(check => check.required && check.status !== 'ok');
   if (failedRequired.length) {
-    options.logger.error(`${options.serviceName} startup dependency check failed`, { checks: startupChecks });
+    options.logger.error(`${options.serviceName} startup dependency check failed: ${summarizeChecks(startupChecks)}`, { checks: startupChecks });
     throw new Error(`Required dependencies unavailable: ${failedRequired.map(check => check.name).join(', ')}`);
   }
 
