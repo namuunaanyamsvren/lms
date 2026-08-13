@@ -130,12 +130,13 @@ export const getGradingPolicy = async (req: Request, res: Response) => {
     include: { settings: true },
   });
   if (!organization) throw AppError.notFound('Organization not found');
-  let gradingScale: Record<string, number> = {};
-  try {
-    gradingScale = organization.settings?.gradingScaleJson ? JSON.parse(organization.settings.gradingScaleJson) : {};
-  } catch {
-    gradingScale = {};
-  }
+  const gradingScale: Record<string, number> = (() => {
+    try {
+      return organization.settings?.gradingScaleJson ? JSON.parse(organization.settings.gradingScaleJson) : {};
+    } catch {
+      return {};
+    }
+  })();
   return res.json({ success: true, data: { gradingScale } });
 };
 

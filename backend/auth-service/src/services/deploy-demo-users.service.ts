@@ -244,7 +244,6 @@ export const startDeployDemoUserSeed = (logger: Logger) => {
   const maxAttempts = Number(process.env.DEMO_USERS_SEED_MAX_ATTEMPTS || 12);
   const intervalMs = Number(process.env.DEMO_USERS_SEED_RETRY_MS || 10000);
   let attempts = 0;
-  let timer: NodeJS.Timeout | undefined;
 
   const run = async () => {
     attempts += 1;
@@ -268,7 +267,7 @@ export const startDeployDemoUserSeed = (logger: Logger) => {
     }
   };
 
-  timer = setInterval(run, intervalMs);
+  const timer = setInterval(run, intervalMs);
   timer.unref();
   void run();
 };

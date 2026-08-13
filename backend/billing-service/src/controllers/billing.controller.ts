@@ -1,5 +1,5 @@
 import { AppError, EVENTS, getPagination, paginatedData } from '@lms/shared';
-import { PaymentStatus, PlanType, Prisma } from '@prisma/client-billing';
+import { PaymentStatus, PlanType, Prisma, type Invoice } from '@prisma/client-billing';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { enqueueBillingEvent } from '../services/event-outbox.service';
@@ -188,7 +188,7 @@ export const issueInvoice = async (req: Request, res: Response) => {
     const baseDueDate = data.dueDate || new Date();
     const amount = new Prisma.Decimal(data.amount);
     const baseAmount = amount.div(total).toDecimalPlaces(4);
-    const rows: Prisma.InvoiceGetPayload<{}>[] = [];
+    const rows: Invoice[] = [];
     for (let index = 1; index <= total; index += 1) {
       const dueDate = data.dueDate
         ? new Date(baseDueDate.getTime() + (index - 1) * data.installmentIntervalDays * 86_400_000)

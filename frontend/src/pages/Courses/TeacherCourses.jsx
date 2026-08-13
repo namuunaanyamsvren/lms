@@ -21,14 +21,20 @@ export default function TeacherCourses() {
   const [loading, setLoading] = useState(true);
   useEffect(() => { const timer = setTimeout(() => fetchCourses({ search, limit: 50 }).then(setResult), 200); return () => clearTimeout(timer); }, [search]);
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     Promise.all([fetchCourses({ limit: 50 }), fetchTeacherStudents()])
       .then(([coursesResult, studentRows]) => {
+        if (cancelled) return;
         setResult(coursesResult);
         setStudents(studentRows);
         setSelectedCourseId(current => current || coursesResult.items?.[0]?.id || '');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const courses = result.items || [];

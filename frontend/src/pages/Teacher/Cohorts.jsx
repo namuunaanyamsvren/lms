@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -151,9 +151,9 @@ export default function Cohorts() {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedCohortId, setSelectedCohortId] = useState(searchParams.get('cohortId'));
+  const selectedCohortId = searchParams.get('cohortId') || '';
   const [studentToAdd, setStudentToAdd] = useState('');
   const [activeTab, setActiveTab] = useState('students');
   const [csvText, setCsvText] = useState('email,studentId\n');
@@ -171,11 +171,11 @@ export default function Cohorts() {
   const cohorts = cohortsQuery.data || [];
   const courses = coursesQuery.data?.items || [];
   const selectedCohort = cohorts.find((c) => c.id === selectedCohortId) || null;
-
-  useEffect(() => {
-    const cohortId = searchParams.get('cohortId');
-    if (cohortId) setSelectedCohortId(cohortId);
-  }, [searchParams]);
+  const selectCohort = (cohortId) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('cohortId', cohortId);
+    setSearchParams(nextParams);
+  };
 
   const invalidateCohorts = () => queryClient.invalidateQueries({ queryKey: queryKeys.cohorts.all });
 
@@ -321,7 +321,7 @@ export default function Cohorts() {
               {cohorts.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setSelectedCohortId(c.id)}
+                  onClick={() => selectCohort(c.id)}
                   className={`w-full text-left rounded-2xl border px-4 py-3 text-xs transition ${selectedCohortId === c.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}
                 >
                   <p className="font-semibold text-slate-900">{c.course?.title || 'Хичээл'} — {c.name}</p>

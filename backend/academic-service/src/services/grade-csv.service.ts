@@ -17,7 +17,7 @@ const cell = (value: unknown) => {
 // Leading BOM so Excel (still the primary consumer for Cyrillic feedback/notes
 // text) detects UTF-8 instead of mis-rendering as garbled text — matches the
 // convention already used by report-storage.service.ts's CSV exports.
-export const serializeCsv = (rows: Array<Record<string, unknown>>) => '﻿' + [
+export const serializeCsv = (rows: Array<Record<string, unknown>>) => '\uFEFF' + [
   GRADE_CSV_COLUMNS.join(','),
   ...rows.map(row => GRADE_CSV_COLUMNS.map(column => cell(row[column])).join(',')),
 ].join('\r\n');
@@ -27,8 +27,8 @@ export const parseCsv = (input: string, maxRows = 1000) => {
     throw new AppError('CSV file exceeds 5 MB', 413);
   }
   // Strip a leading BOM so re-uploading a file this service (or Excel) exported
-  // doesn't turn the first header into "﻿studentEmail" and fail column validation.
-  input = input.replace(/^﻿/, '');
+  // doesn't turn the first header into "\uFEFFstudentEmail" and fail column validation.
+  input = input.replace(/^\uFEFF/, '');
   const records: string[][] = [];
   let record: string[] = [];
   let value = '';

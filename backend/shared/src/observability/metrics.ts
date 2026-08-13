@@ -13,6 +13,9 @@ type HistogramSample = {
   labels: Labels;
   values: number[];
 };
+type MetricsRouteApp = {
+  get: (path: string, handler: (req: Request, res: Response) => void) => unknown;
+};
 
 const counters = new Map<string, CounterSample>();
 const histograms = new Map<string, HistogramSample>();
@@ -121,7 +124,7 @@ export function renderPrometheusMetrics(serviceName: string): string {
   return `${lines.join('\n')}\n`;
 }
 
-export function registerMetricsRoute(app: { get: Function }, serviceName: string): void {
+export function registerMetricsRoute(app: MetricsRouteApp, serviceName: string): void {
   app.get('/metrics', (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
     res.status(200).send(renderPrometheusMetrics(serviceName));

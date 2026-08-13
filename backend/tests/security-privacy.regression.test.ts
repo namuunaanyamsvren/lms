@@ -182,7 +182,8 @@ describe('tenant and SQL injection regression guardrails', () => {
       withFileTypes: true,
     })
       .filter(entry => entry.isDirectory() && (entry.name === 'shared' || entry.name.endsWith('-service')))
-      .map(entry => path.resolve(__dirname, '..', entry.name, 'src'));
+      .map(entry => path.resolve(__dirname, '..', entry.name, 'src'))
+      .filter(sourceDirectory => fs.existsSync(sourceDirectory));
     const sourceFiles: string[] = [];
     const walk = (directory: string) => {
       for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

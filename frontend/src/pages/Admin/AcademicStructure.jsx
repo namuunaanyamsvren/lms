@@ -24,11 +24,22 @@ export default function AcademicStructure() {
   const online = useNetworkStatus();
   const { run, pending } = useAsyncAction();
   const confirm = useConfirm();
-  const load = () => { setError(null); return fetchAcademicStructure().then(setData).catch(setError); };
-  // Initial remote synchronization.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  const load = ({ resetError = true } = {}) => {
+    if (resetError) setError(null);
+    return fetchAcademicStructure().then(setData).catch(setError);
+  };
   useEffect(() => {
-    load();
+    let cancelled = false;
+    fetchAcademicStructure()
+      .then((structure) => {
+        if (!cancelled) setData(structure);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
   const actions = useMemo(() => ({
     years: () => setForm({ resource: 'years', name: '', startDate: '', endDate: '', status: 'PLANNED' }),

@@ -13,8 +13,9 @@ const audit=async(org:string,quizId:string,userId:string,eventType:string,attemp
 
 export type AttemptQuestionSnapshot={id:string;text:string;type:string;options:Array<{id:string;text:string}>;correctAnswer:any;points:number;order:number};
 const shuffled=<T>(values:T[])=>{const copy=[...values];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;};
+const parseCorrectAnswer=(value:string|null|undefined)=>{try{return JSON.parse(value||'null')}catch{return value}};
 export const buildQuestionSnapshot=(quiz:any):AttemptQuestionSnapshot[]=>{
- let rows=quiz.questionLinks.map((link:any)=>{const q=link.question;let correctAnswer:any=null;try{correctAnswer=JSON.parse(q.correctAnswer||'null')}catch{correctAnswer=q.correctAnswer}let options=q.optionsJson?JSON.parse(q.optionsJson):[];if(quiz.shuffleOptions)options=shuffled(options);return {id:q.id,text:q.text,type:q.type,options,correctAnswer,points:link.pointsOverride??q.points,order:link.order};});
+ let rows=quiz.questionLinks.map((link:any)=>{const q=link.question;const correctAnswer=parseCorrectAnswer(q.correctAnswer);let options=q.optionsJson?JSON.parse(q.optionsJson):[];if(quiz.shuffleOptions)options=shuffled(options);return {id:q.id,text:q.text,type:q.type,options,correctAnswer,points:link.pointsOverride??q.points,order:link.order};});
  if(quiz.shuffleQuestions)rows=shuffled(rows);return rows.map((q:any,index:number)=>({...q,order:index+1}));
 };
 // Pure so it's unit-testable without a DB: the hard deadline for an attempt is
