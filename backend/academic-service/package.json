@@ -29,7 +29,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pdfkit": "^0.19.1",
-    "prisma": "^5.7.1",
+    "prisma": "^7.9.1",
     "qrcode": "^1.5.4",
     "redis": "^4.6.12",
     "sanitize-html": "^2.17.6",
