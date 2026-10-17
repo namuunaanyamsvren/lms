@@ -30,7 +30,7 @@ jobs:
       GOOGLE_CLIENT_SECRET: restore-drill-secret
       GOOGLE_REDIRECT_URI: http://localhost:5173/auth/callback
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Start WAL-archiving PostgreSQL
         run: docker compose -f docker-compose.yml -f docker-compose.development.yml up -d --build postgres
       - name: Create and verify physical base backup
